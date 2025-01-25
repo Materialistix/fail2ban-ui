@@ -14,11 +14,21 @@ func RegisterRoutes(r *gin.Engine) {
         api.GET("/summary", SummaryHandler)
         api.POST("/jails/:jail/unban/:ip", UnbanIPHandler)
 
-        // New config endpoints
-        api.GET("/jails/:jail/config", GetJailConfigHandler)
-        api.POST("/jails/:jail/config", SetJailConfigHandler)
+        // config endpoints
+        api.GET("/jails/:jail/config", GetJailFilterConfigHandler)
+        api.POST("/jails/:jail/config", SetJailFilterConfigHandler)
 
-        // Reload endpoint
-        api.POST("/fail2ban/reload", ReloadFail2banHandler)
+		// settings
+		api.GET("/settings", GetSettingsHandler)
+		api.POST("/settings", UpdateSettingsHandler)
+	
+		// filter debugger
+		api.GET("/filters", ListFiltersHandler)
+		api.POST("/filters/test", TestFilterHandler)
+		// TODO create or generate new filters
+		// api.POST("/filters/generate", GenerateFilterHandler)
+
+		// Reload endpoint
+		api.POST("/fail2ban/reload", ReloadFail2banHandler)
     }
 }
