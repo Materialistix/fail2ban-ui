@@ -33,12 +33,31 @@
 <body class="bg-light">
 <!-- NavBar -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">
-      <strong>Fail2ban UI</strong>
-    </a>
-  </div>
-</nav>
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">
+        <strong>Fail2ban UI</strong>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+        data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+        aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+  
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="showSection('dashboardSection')">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="showSection('filterSection')">Filter Debug</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="showSection('settingsSection')">Settings</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+</nav> 
 
 <!-- Reload Banner -->
 <div id="reloadBanner" class="bg-warning text-dark p-3 text-center">
@@ -48,10 +67,61 @@
   </button>
 </div>
 
-<div class="container my-4">
+<!-- Dashboard Section -->
+<div id="dashboardSection" class="container my-4">
   <h1 class="mb-4">Dashboard</h1>
   <div id="dashboard"></div>
 </div>
+
+<!-- Settings Section -->
+<div id="settingsSection" style="display: none;" class="container my-4">
+    <h2>Settings</h2>
+    <form onsubmit="saveSettings(event)">
+      <div class="mb-3">
+        <label for="languageSelect" class="form-label">Language</label>
+        <select id="languageSelect" class="form-select">
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </div>
+  
+      <div class="mb-3">
+        <label for="alertEmail" class="form-label">Alert Email</label>
+        <input type="email" class="form-control" id="alertEmail"/>
+      </div>
+  
+      <div class="mb-3">
+        <label class="form-label">Alert Countries</label>
+        <small class="text-muted">(Choose which country bans trigger an email. "all" for everything.)</small>
+        <input type="text" class="form-control" id="alertCountries"
+          placeholder="e.g. all or DE,CH"/>
+      </div>
+  
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+  </div>
+
+<!-- Filter Debug Section -->
+<div id="filterSection" style="display: none;" class="container my-4">
+    <h2>Filter Debug</h2>
+  
+    <!-- Dropdown of available filters -->
+    <div class="mb-3">
+      <label for="filterSelect" class="form-label">Select a Filter</label>
+      <select id="filterSelect" class="form-select"></select>
+    </div>
+  
+    <!-- Textarea for log lines to test -->
+    <div class="mb-3">
+      <label class="form-label">Log Lines</label>
+      <textarea id="logLinesTextarea" class="form-control" rows="6"></textarea>
+    </div>
+  
+    <button class="btn btn-secondary" onclick="testSelectedFilter()">Test Filter</button>
+    <hr/>
+  
+    <div id="testResults"></div>
+</div> 
 
 <!-- Footer -->
 <footer class="text-center mt-4 mb-4">
@@ -345,6 +415,180 @@ function reloadFail2ban() {
       showLoading(false);
     });
 }
+
+function loadSettings() {
+  showLoading(true);
+  fetch('/api/settings')
+    .then(res => res.json())
+    .then(data => {
+      // populate the form
+      document.getElementById('languageSelect').value = data.language || 'en';
+      document.getElementById('alertEmail').value = data.alertEmail || '';
+      if (data.alertCountries && data.alertCountries.length > 0) {
+        if (data.alertCountries[0] === 'all') {
+          document.getElementById('alertCountries').value = 'all';
+        } else {
+          document.getElementById('alertCountries').value = data.alertCountries.join(',');
+        }
+      }
+    })
+    .catch(err => {
+      alert('Error loading settings: ' + err);
+    })
+    .finally(() => showLoading(false));
+}
+
+function saveSettings(e) {
+  e.preventDefault(); // prevent form submission
+
+  showLoading(true);
+  const lang = document.getElementById('languageSelect').value;
+  const mail = document.getElementById('alertEmail').value;
+  const countries = document.getElementById('alertCountries').value;
+
+  let countryList = [];
+  if (!countries || countries.trim() === '') {
+    countryList.push('all');
+  } else {
+    countryList = countries.split(',').map(s => s.trim());
+  }
+
+  const body = {
+    language: lang,
+    alertEmail: mail,
+    alertCountries: countryList
+  };
+
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.error) {
+      alert('Error saving settings: ' + data.error);
+    } else {
+      alert(data.message || 'Settings saved');
+      if (data.needsRestart) {
+        // show the same "reload" banner used for filter changes
+        document.getElementById('reloadBanner').style.display = 'block';
+      }
+    }
+  })
+  .catch(err => {
+    alert('Error: ' + err);
+  })
+  .finally(() => showLoading(false));
+}
+
+function showSection(sectionId) {
+  // hide all sections
+  document.getElementById('dashboardSection').style.display = 'none';
+  document.getElementById('filterSection').style.display = 'none';
+  document.getElementById('settingsSection').style.display = 'none';
+
+  // show the requested section
+  document.getElementById(sectionId).style.display = 'block';
+
+  // If it's filterSection, load filters
+  if (sectionId === 'filterSection') {
+    showFilterSection();
+  }
+  // If it's settingsSection, load settings
+  if (sectionId === 'settingsSection') {
+    loadSettings();
+  }
+}
+
+// Load the list of filters from /api/filters
+function loadFilters() {
+  showLoading(true);
+  fetch('/api/filters')
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error loading filters: ' + data.error);
+        return;
+      }
+      const select = document.getElementById('filterSelect');
+      select.innerHTML = ''; // clear existing
+      if (!data.filters || data.filters.length === 0) {
+        // optional fallback
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No Filters Found';
+        select.appendChild(opt);
+      } else {
+        data.filters.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f;
+          opt.textContent = f;
+          select.appendChild(opt);
+        });
+      }
+    })
+    .catch(err => {
+      alert('Error loading filters: ' + err);
+    })
+    .finally(() => showLoading(false));
+}
+
+// Called when clicking "Test Filter" button
+function testSelectedFilter() {
+  const filterName = document.getElementById('filterSelect').value;
+  const lines = document.getElementById('logLinesTextarea').value.split('\n');
+  
+  if (!filterName) {
+    alert('Please select a filter.');
+    return;
+  }
+
+  showLoading(true);
+  fetch('/api/filters/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filterName: filterName,
+      logLines: lines
+    })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error: ' + data.error);
+        return;
+      }
+      // data.matches, for example
+      renderTestResults(data.matches);
+    })
+    .catch(err => {
+      alert('Error: ' + err);
+    })
+    .finally(() => showLoading(false));
+}
+
+function renderTestResults(matches) {
+  let html = '<h5>Test Results</h5>';
+  if (!matches || matches.length === 0) {
+    html += '<p>No matches found.</p>';
+  } else {
+    html += '<ul>';
+    matches.forEach(m => {
+      html += '<li>' + m + '</li>';
+    });
+    html += '</ul>';
+  }
+  document.getElementById('testResults').innerHTML = html;
+}
+
+// When showing the filter section
+function showFilterSection() {
+  loadFilters(); // fetch the filter list
+  document.getElementById('testResults').innerHTML = '';
+  document.getElementById('logLinesTextarea').value = '';
+}
+
 </script>
 </body>
 </html>

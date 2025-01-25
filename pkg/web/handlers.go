@@ -1,17 +1,20 @@
 package web
 
 import (
+	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/swissmakers/fail2ban-ui/internal/config"
 	"github.com/swissmakers/fail2ban-ui/internal/fail2ban"
 )
 
 // SummaryResponse is what we return from /api/summary
 type SummaryResponse struct {
-	Jails    []fail2ban.JailInfo     `json:"jails"`
-	LastBans []fail2ban.BanEvent     `json:"lastBans"`
+	Jails    []fail2ban.JailInfo `json:"jails"`
+	LastBans []fail2ban.BanEvent `json:"lastBans"`
 }
 
 // SummaryHandler returns a JSON summary of all jails, including
@@ -78,53 +81,117 @@ func sortByTimeDesc(events []fail2ban.BanEvent) {
 	}
 }
 
-// IndexHandler serves the main HTML page
+// IndexHandler serves the HTML page
 func IndexHandler(c *gin.Context) {
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"timestamp": time.Now().Format(time.RFC1123),
 	})
 }
 
-// GetJailConfigHandler returns the raw config for a given jail
-func GetJailConfigHandler(c *gin.Context) {
-    jail := c.Param("jail")
-    cfg, err := fail2ban.GetJailConfig(jail)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{
-        "jail":   jail,
-        "config": cfg,
-    })
+// GetJailFilterConfigHandler returns the raw filter config for a given jail
+func GetJailFilterConfigHandler(c *gin.Context) {
+	jail := c.Param("jail")
+	cfg, err := fail2ban.GetJailConfig(jail)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"jail":   jail,
+		"config": cfg,
+	})
 }
 
-// SetJailConfigHandler overwrites the jail config with new content
-func SetJailConfigHandler(c *gin.Context) {
-    jail := c.Param("jail")
+// SetJailFilterConfigHandler overwrites the current filter config with new content
+func SetJailFilterConfigHandler(c *gin.Context) {
+	jail := c.Param("jail")
 
-    var req struct {
-        Config string `json:"config"`
-    }
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON body"})
-        return
-    }
+	var req struct {
+		Config string `json:"config"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON body"})
+		return
+	}
 
-    if err := fail2ban.SetJailConfig(jail, req.Config); err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+	if err := fail2ban.SetJailConfig(jail, req.Config); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"message": "jail config updated"})
+	c.JSON(http.StatusOK, gin.H{"message": "jail config updated"})
+}
+
+// GetSettingsHandler returns the current fail2ban-ui settings
+func GetSettingsHandler(c *gin.Context) {
+	s := config.GetSettings()
+	c.JSON(http.StatusOK, s)
+}
+
+// UpdateSettingsHandler updates the fail2ban-ui settings
+func UpdateSettingsHandler(c *gin.Context) {
+	//	var req config.Settings
+	//	if err := c.ShouldBindJSON(&req); err != nil {
+	//		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+	//		return
+	//	}
+
+	//	needsRestart, err := config.UpdateSettings(req)
+	//	if err != nil {
+	//		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//		return
+	//	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Settings updated",
+		//		"needsRestart":  needsRestart,
+	})
+}
+
+// ListFiltersHandler returns a JSON array of filter names
+// found as *.conf in /etc/fail2ban/filter.d
+func ListFiltersHandler(c *gin.Context) {
+	dir := "/etc/fail2ban/filter.d" // adjust if needed
+
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to read filter directory: " + err.Error(),
+		})
+		return
+	}
+
+	var filters []string
+	for _, f := range files {
+		if !f.IsDir() && strings.HasSuffix(f.Name(), ".conf") {
+			name := strings.TrimSuffix(f.Name(), ".conf")
+			filters = append(filters, name)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"filters": filters})
+}
+
+func TestFilterHandler(c *gin.Context) {
+	var req struct {
+		FilterName string   `json:"filterName"`
+		LogLines   []string `json:"logLines"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+		return
+	}
+
+	// For now, just pretend nothing matches
+	c.JSON(http.StatusOK, gin.H{"matches": []string{}})
 }
 
 // ReloadFail2banHandler reloads the Fail2ban service
 func ReloadFail2banHandler(c *gin.Context) {
-    err := fail2ban.ReloadFail2ban()
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"message": "Fail2ban reloaded successfully"})
+	err := fail2ban.ReloadFail2ban()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Fail2ban reloaded successfully"})
 }
