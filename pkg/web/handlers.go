@@ -1,8 +1,10 @@
 package web
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -106,6 +108,7 @@ func GetJailFilterConfigHandler(c *gin.Context) {
 func SetJailFilterConfigHandler(c *gin.Context) {
 	jail := c.Param("jail")
 
+	// Parse JSON body (containing the new filter content)
 	var req struct {
 		Config string `json:"config"`
 	}
@@ -114,44 +117,57 @@ func SetJailFilterConfigHandler(c *gin.Context) {
 		return
 	}
 
+	// Write the filter config file to /etc/fail2ban/filter.d/<jail>.conf
 	if err := fail2ban.SetJailConfig(jail, req.Config); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Mark reload needed in our UI settings
+	//	if err := config.MarkReloadNeeded(); err != nil {
+	//		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//		return
+	//	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "jail config updated"})
+
+	// Return a simple JSON response without forcing a blocking alert
+	//	c.JSON(http.StatusOK, gin.H{
+	//		"message":      "Filter updated, reload needed",
+	//		"reloadNeeded": true,
+	//	})
 }
 
-// GetSettingsHandler returns the current fail2ban-ui settings
+// GetSettingsHandler returns the entire AppSettings struct as JSON
 func GetSettingsHandler(c *gin.Context) {
 	s := config.GetSettings()
 	c.JSON(http.StatusOK, s)
 }
 
-// UpdateSettingsHandler updates the fail2ban-ui settings
+// UpdateSettingsHandler updates the AppSettings from a JSON body
 func UpdateSettingsHandler(c *gin.Context) {
-	//	var req config.Settings
-	//	if err := c.ShouldBindJSON(&req); err != nil {
-	//		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
-	//		return
-	//	}
+	var req config.AppSettings
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+		return
+	}
 
-	//	needsRestart, err := config.UpdateSettings(req)
-	//	if err != nil {
-	//		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-	//		return
-	//	}
+	newSettings, err := config.UpdateSettings(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Settings updated",
-		//		"needsRestart":  needsRestart,
+		"message":      "Settings updated",
+		"reloadNeeded": newSettings.ReloadNeeded,
 	})
 }
 
 // ListFiltersHandler returns a JSON array of filter names
 // found as *.conf in /etc/fail2ban/filter.d
 func ListFiltersHandler(c *gin.Context) {
-	dir := "/etc/fail2ban/filter.d" // adjust if needed
+	dir := "/etc/fail2ban/filter.d"
 
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -186,12 +202,48 @@ func TestFilterHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"matches": []string{}})
 }
 
+// ApplyFail2banSettings updates /etc/fail2ban/jail.local [DEFAULT] with our JSON
+func ApplyFail2banSettings(jailLocalPath string) error {
+	s := config.GetSettings()
+
+	// open /etc/fail2ban/jail.local, parse or do a simplistic approach:
+	// TODO: -> maybe we store [DEFAULT] block in memory, replace lines
+	// or do a line-based approach. Example is simplistic:
+
+	newLines := []string{
+		"[DEFAULT]",
+		fmt.Sprintf("bantime.increment = %t", s.BantimeIncrement),
+		fmt.Sprintf("ignoreip = %s", s.IgnoreIP),
+		fmt.Sprintf("bantime = %s", s.Bantime),
+		fmt.Sprintf("findtime = %s", s.Findtime),
+		fmt.Sprintf("maxretry = %d", s.Maxretry),
+		fmt.Sprintf("destemail = %s", s.Destemail),
+		fmt.Sprintf("sender = %s", s.Sender),
+		"",
+	}
+	content := strings.Join(newLines, "\n")
+
+	return os.WriteFile(jailLocalPath, []byte(content), 0644)
+}
+
 // ReloadFail2banHandler reloads the Fail2ban service
 func ReloadFail2banHandler(c *gin.Context) {
-	err := fail2ban.ReloadFail2ban()
-	if err != nil {
+	// First we write our new settings to /etc/fail2ban/jail.local
+	//	if err := fail2ban.ApplyFail2banSettings("/etc/fail2ban/jail.local"); err != nil {
+	//		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//		return
+	//	}
+
+	// Then reload
+	if err := fail2ban.ReloadFail2ban(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// We set reload done in config
+	//if err := config.MarkReloadDone(); err != nil {
+	//	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//	return
+	//}
 	c.JSON(http.StatusOK, gin.H{"message": "Fail2ban reloaded successfully"})
 }

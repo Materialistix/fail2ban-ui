@@ -9,19 +9,19 @@ func RegisterRoutes(r *gin.Engine) {
 	// Render the dashboard
 	r.GET("/", IndexHandler)
 
-    api := r.Group("/api")
-    {
-        api.GET("/summary", SummaryHandler)
-        api.POST("/jails/:jail/unban/:ip", UnbanIPHandler)
+	api := r.Group("/api")
+	{
+		api.GET("/summary", SummaryHandler)
+		api.POST("/jails/:jail/unban/:ip", UnbanIPHandler)
 
-        // config endpoints
-        api.GET("/jails/:jail/config", GetJailFilterConfigHandler)
-        api.POST("/jails/:jail/config", SetJailFilterConfigHandler)
+		// config endpoints
+		api.GET("/jails/:jail/config", GetJailFilterConfigHandler)
+		api.POST("/jails/:jail/config", SetJailFilterConfigHandler)
 
 		// settings
 		api.GET("/settings", GetSettingsHandler)
 		api.POST("/settings", UpdateSettingsHandler)
-	
+
 		// filter debugger
 		api.GET("/filters", ListFiltersHandler)
 		api.POST("/filters/test", TestFilterHandler)
@@ -30,5 +30,5 @@ func RegisterRoutes(r *gin.Engine) {
 
 		// Reload endpoint
 		api.POST("/fail2ban/reload", ReloadFail2banHandler)
-    }
+	}
 }
