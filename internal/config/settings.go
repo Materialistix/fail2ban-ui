@@ -7,13 +7,12 @@ import (
 	"sync"
 )
 
-// UISettings holds both the UI settings (like language) and
+// AppSettings holds both the UI settings (like language) and
 // relevant Fail2ban jail/local config options.
-type UISettings struct {
-	// UI-specific
-	Language       string `json:"language"`
-	// Whether a reload is needed (e.g. user changed filter or jail settings).
-	ReloadNeeded   bool   `json:"reloadNeeded"`
+type AppSettings struct {
+	Language       string   `json:"language"`
+	ReloadNeeded   bool     `json:"reloadNeeded"`
+	AlertCountries []string `json:"alertCountries"`
 
 	// These mirror some Fail2ban [DEFAULT] section parameters from jail.local
 	BantimeIncrement bool   `json:"bantimeIncrement"`
@@ -30,7 +29,7 @@ const settingsFile = "fail2ban-ui-settings.json"
 
 // in-memory copy of settings
 var (
-	currentSettings UISettings
+	currentSettings AppSettings
 	settingsLock    sync.RWMutex
 )
 
@@ -55,9 +54,10 @@ func setDefaults() {
 	settingsLock.Lock()
 	defer settingsLock.Unlock()
 
-	currentSettings = UISettings{
+	currentSettings = AppSettings{
 		Language:       "en",
 		ReloadNeeded:   false,
+		AlertCountries: []string{"all"},
 
 		BantimeIncrement: true,
 		IgnoreIP:         "127.0.0.1/8 ::1 172.16.10.1/24",
@@ -79,7 +79,7 @@ func loadSettings() error {
 		return err
 	}
 
-	var s UISettings
+	var s AppSettings
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
@@ -103,33 +103,54 @@ func saveSettings() error {
 }
 
 // GetSettings returns a copy of the current settings
-func GetSettings() UISettings {
+func GetSettings() AppSettings {
 	settingsLock.RLock()
 	defer settingsLock.RUnlock()
 	return currentSettings
 }
 
-// UpdateSettings modifies the in-memory settings, sets ReloadNeeded if required, then saves to disk.
-// Optionally, we can detect changes that require a reload vs. changes that don't.
-func UpdateSettings(new UISettings) (UISettings, error) {
+// MarkReloadNeeded sets reloadNeeded = true and saves JSON
+func MarkReloadNeeded() error {
 	settingsLock.Lock()
 	defer settingsLock.Unlock()
 
-	// If user changed certain fields that require a Fail2ban reload, set ReloadNeeded = true.
-	// For example, if any of these fields changed:
-	reloadNeededBefore := currentSettings.ReloadNeeded
+	currentSettings.ReloadNeeded = true
+	return saveSettings()
+}
 
-	if currentSettings.BantimeIncrement != new.BantimeIncrement ||
-		currentSettings.IgnoreIP != new.IgnoreIP ||
-		currentSettings.Bantime != new.Bantime ||
-		currentSettings.Findtime != new.Findtime ||
-		currentSettings.Maxretry != new.Maxretry ||
-		currentSettings.Destemail != new.Destemail ||
-		currentSettings.Sender != new.Sender {
+// MarkReloadDone sets reloadNeeded = false and saves JSON
+func MarkReloadDone() error {
+	settingsLock.Lock()
+	defer settingsLock.Unlock()
+
+	currentSettings.ReloadNeeded = false
+	return saveSettings()
+}
+
+// UpdateSettings merges new settings with old and sets reloadNeeded if needed
+func UpdateSettings(new AppSettings) (AppSettings, error) {
+	settingsLock.Lock()
+	defer settingsLock.Unlock()
+
+	old := currentSettings
+
+	// If certain fields change, we mark reload needed
+	if old.BantimeIncrement != new.BantimeIncrement ||
+		old.IgnoreIP != new.IgnoreIP ||
+		old.Bantime != new.Bantime ||
+		old.Findtime != new.Findtime ||
+		old.Maxretry != new.Maxretry ||
+		old.Destemail != new.Destemail ||
+		old.Sender != new.Sender {
 		new.ReloadNeeded = true
 	} else {
 		// preserve previous ReloadNeeded if it was already true
-		new.ReloadNeeded = new.ReloadNeeded || reloadNeededBefore
+		new.ReloadNeeded = new.ReloadNeeded || old.ReloadNeeded
+	}
+
+	// Countries change? Currently also requires a reload
+	if !equalStringSlices(old.AlertCountries, new.AlertCountries) {
+		new.ReloadNeeded = true
 	}
 
 	currentSettings = new
@@ -141,10 +162,18 @@ func UpdateSettings(new UISettings) (UISettings, error) {
 	return currentSettings, nil
 }
 
-// MarkReloadDone sets ReloadNeeded = false after the user reloaded fail2ban
-func MarkReloadDone() error {
-	settingsLock.Lock()
-	defer settingsLock.Unlock()
-	currentSettings.ReloadNeeded = false
-	return saveSettings()
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	m := make(map[string]bool)
+	for _, x := range a {
+		m[x] = false
+	}
+	for _, x := range b {
+		if _, ok := m[x]; !ok {
+			return false
+		}
+	}
+	return true
 }
