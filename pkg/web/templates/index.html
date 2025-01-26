@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Fail2ban UI Dashboard</title>
   <!-- Bootstrap 5 (CDN) -->
   <link 
@@ -30,8 +32,11 @@
     }
   </style>
 </head>
+
 <body class="bg-light">
-<!-- NavBar -->
+<!-- ******************************************************************* -->
+<!--                            NAVIGATION :                             -->
+<!-- ******************************************************************* -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container-fluid">
       <a class="navbar-brand" href="#">
@@ -57,7 +62,8 @@
         </ul>
       </div>
     </div>
-</nav> 
+</nav>
+<!-- ******************************************************************* -->
 
 <!-- Reload Banner -->
 <div id="reloadBanner" class="bg-warning text-dark p-3 text-center">
@@ -67,11 +73,33 @@
   </button>
 </div>
 
+<!-- ******************************************************************* -->
+<!--                       APP Sections (Pages) :                        -->
+<!-- ******************************************************************* -->
+
 <!-- Dashboard Section -->
 <div id="dashboardSection" class="container my-4">
   <h1 class="mb-4">Dashboard</h1>
   <div id="dashboard"></div>
 </div>
+
+<!-- Filter Debug Section -->
+<div id="filterSection" style="display: none;" class="container my-4">
+  <h2>Filter Debug</h2>
+  <!-- Dropdown of available jail/filters -->
+  <div class="mb-3">
+    <label for="filterSelect" class="form-label">Select a Filter</label>
+    <select id="filterSelect" class="form-select"></select>
+  </div>
+  <!-- Textarea for log lines to test -->
+  <div class="mb-3">
+    <label class="form-label">Log Lines</label>
+    <textarea id="logLinesTextarea" class="form-control" rows="6" disabled></textarea>
+  </div>
+  <button class="btn btn-secondary" onclick="testSelectedFilter()">Test Filter</button>
+  <hr/>
+  <div id="testResults"></div>
+</div> 
 
 <!-- Settings Section -->
 <div id="settingsSection" style="display: none;" class="container my-4">
@@ -79,49 +107,33 @@
     <form onsubmit="saveSettings(event)">
       <div class="mb-3">
         <label for="languageSelect" class="form-label">Language</label>
-        <select id="languageSelect" class="form-select">
+        <select id="languageSelect" class="form-select" disabled>
           <option value="en">English</option>
           <option value="de">Deutsch</option>
         </select>
       </div>
-  
       <div class="mb-3">
         <label for="alertEmail" class="form-label">Alert Email</label>
         <input type="email" class="form-control" id="alertEmail"/>
       </div>
-  
       <div class="mb-3">
-        <label class="form-label">Alert Countries</label>
-        <small class="text-muted">(Choose which country bans trigger an email. "all" for everything.)</small>
-        <input type="text" class="form-control" id="alertCountries"
-          placeholder="e.g. all or DE,CH"/>
+        <label for="alertCountries" class="form-label">Select alert Countries</label>
+        <p class="text-muted">Choose which country-IP bans should trigger an email. With CTRL, you can select multiple.</p>
+        <select id="alertCountries" class="form-select" multiple size="7">
+          <option value="ALL">ALL (Every Country)</option>
+          <option value="CH">Switzerland (CH)</option>
+          <option value="DE">Germany (DE)</option>
+          <option value="IT">Italy (IT)</option>
+          <option value="FR">France (FR)</option>
+          <option value="UK">England (UK)</option>
+          <option value="US">United States (US)</option>
+          <!-- Maybe i will add more later.. -->
+        </select>
       </div>
-  
       <button type="submit" class="btn btn-primary">Save</button>
     </form>
   </div>
-
-<!-- Filter Debug Section -->
-<div id="filterSection" style="display: none;" class="container my-4">
-    <h2>Filter Debug</h2>
-  
-    <!-- Dropdown of available filters -->
-    <div class="mb-3">
-      <label for="filterSelect" class="form-label">Select a Filter</label>
-      <select id="filterSelect" class="form-select"></select>
-    </div>
-  
-    <!-- Textarea for log lines to test -->
-    <div class="mb-3">
-      <label class="form-label">Log Lines</label>
-      <textarea id="logLinesTextarea" class="form-control" rows="6"></textarea>
-    </div>
-  
-    <button class="btn btn-secondary" onclick="testSelectedFilter()">Test Filter</button>
-    <hr/>
-  
-    <div id="testResults"></div>
-</div> 
+<!-- ******************************************************************* -->
 
 <!-- Footer -->
 <footer class="text-center mt-4 mb-4">
@@ -134,6 +146,9 @@
   </p>
 </footer>
 
+<!-- ******************************************************************* -->
+<!--                       APP Components (HTML) :                       -->
+<!-- ******************************************************************* -->
 <!-- Loading Overlay -->
 <div id="loading-overlay" class="d-flex">
   <div class="spinner-border text-light" role="status">
@@ -165,6 +180,7 @@
     </div>
   </div>
 </div>
+<!-- ******************************************************************* -->
 
 <!-- Bootstrap 5 JS (for modal, etc.) -->
 <script 
@@ -172,11 +188,22 @@
 </script>
 
 <script>
+// For information: We avoid ES6 backticks in our JS, to prevent confusion with the Go template parser.
 "use strict";
 
-// We avoid ES6 backticks here to prevent confusion with the Go template parser.
+//*******************************************************************
+//*                 Init page and main-components :                 *
+//*******************************************************************
 
+// Init and run first function, when DOM is ready
 var currentJailForConfig = null;
+window.addEventListener('DOMContentLoaded', function() {
+  showLoading(true);
+  checkReloadNeeded();
+  fetchSummary().then(function() {
+    showLoading(false);
+  });
+});
 
 // Toggle the loading overlay (with !important)
 function showLoading(show) {
@@ -188,12 +215,43 @@ function showLoading(show) {
   }
 }
 
-window.addEventListener('DOMContentLoaded', function() {
-  showLoading(true);
-  fetchSummary().then(function() {
-    showLoading(false);
-  });
-});
+// Check if there is still a reload of the fail2ban service needed
+function checkReloadNeeded() {
+  fetch('/api/settings')
+    .then(res => res.json())
+    .then(data => {
+      if (data.reloadNeeded) {
+        document.getElementById('reloadBanner').style.display = 'block';
+      } else {
+        document.getElementById('reloadBanner').style.display = 'none';
+      }
+    })
+    .catch(err => console.error('Error checking reloadNeeded:', err));
+}
+
+// Load dynamically the other pages when navigating in nav
+function showSection(sectionId) {
+  // hide all sections
+  document.getElementById('dashboardSection').style.display = 'none';
+  document.getElementById('filterSection').style.display = 'none';
+  document.getElementById('settingsSection').style.display = 'none';
+
+  // show the requested section
+  document.getElementById(sectionId).style.display = 'block';
+
+  // If it's filterSection, load filters
+  if (sectionId === 'filterSection') {
+    showFilterSection();
+  }
+  // If it's settingsSection, load settings
+  if (sectionId === 'settingsSection') {
+    loadSettings();
+  }
+}
+
+//*******************************************************************
+//*               Fetch data and render dashboard :                 *
+//*******************************************************************
 
 // Fetch summary (jails, stats, last 5 bans)
 function fetchSummary() {
@@ -228,7 +286,7 @@ function renderDashboard(data) {
       + '    <tr>'
       + '      <th>Jail Name</th>'
       + '      <th>Total Banned</th>'
-      + '      <th>New in Last Hour</th>'
+      + '      <th>New Last Hour</th>'
       + '      <th>Banned IPs (Unban)</th>'
       + '    </tr>'
       + '  </thead>'
@@ -305,6 +363,10 @@ function renderBannedIPs(jailName, ips) {
   return content;
 }
 
+//*******************************************************************
+//*                  Functions to manage IP-bans :                  *
+//*******************************************************************
+
 // Unban IP
 function unbanIP(jail, ip) {
   if (!confirm("Unban IP " + ip + " from jail " + jail + "?")) {
@@ -317,7 +379,7 @@ function unbanIP(jail, ip) {
       if (data.error) {
         alert("Error: " + data.error);
       } else {
-        alert(data.message || "IP unbanned");
+        alert(data.message || "IP unbanned successfully");
       }
       return fetchSummary();
     })
@@ -329,7 +391,11 @@ function unbanIP(jail, ip) {
     });
 }
 
-// Open the jail config modal
+//*******************************************************************
+//*                Filter-mod and config-mod actions :              *
+//*******************************************************************
+
+// Open jail/filter modal and load filter-config
 function openJailConfigModal(jailName) {
   currentJailForConfig = jailName;
   var textArea = document.getElementById('jailConfigTextarea');
@@ -358,7 +424,7 @@ function openJailConfigModal(jailName) {
     });
 }
 
-// Save jail config
+// Save filter config for the current opened jail
 function saveJailConfig() {
   if (!currentJailForConfig) return;
   showLoading(true);
@@ -374,7 +440,8 @@ function saveJailConfig() {
       if (data.error) {
         alert("Error saving config: " + data.error);
       } else {
-        alert(data.message || "Config saved");
+        //alert(data.message || "Config saved");
+        console.log("Filter saved successfully. Reload needed? " + data.reloadNeeded);
         // Hide modal
         var modalEl = document.getElementById('jailConfigModal');
         var modalObj = bootstrap.Modal.getInstance(modalEl);
@@ -391,44 +458,32 @@ function saveJailConfig() {
     });
 }
 
-// Reload Fail2ban
-function reloadFail2ban() {
-  if (!confirm("Reload Fail2ban now?")) return;
-  showLoading(true);
-  fetch('/api/fail2ban/reload', { method: 'POST' })
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
-      if (data.error) {
-        alert("Error: " + data.error);
-      } else {
-        alert(data.message || "Fail2ban reloaded");
-        // Hide reload banner
-        document.getElementById('reloadBanner').style.display = 'none';
-        // Refresh data
-        return fetchSummary();
-      }
-    })
-    .catch(function(err) {
-      alert("Error: " + err);
-    })
-    .finally(function() {
-      showLoading(false);
-    });
-}
-
+// Load current settings when opening settings page
 function loadSettings() {
   showLoading(true);
   fetch('/api/settings')
     .then(res => res.json())
     .then(data => {
-      // populate the form
+      // populate language, email, etc...
       document.getElementById('languageSelect').value = data.language || 'en';
-      document.getElementById('alertEmail').value = data.alertEmail || '';
-      if (data.alertCountries && data.alertCountries.length > 0) {
-        if (data.alertCountries[0] === 'all') {
-          document.getElementById('alertCountries').value = 'all';
-        } else {
-          document.getElementById('alertCountries').value = data.alertCountries.join(',');
+      document.getElementById('alertEmail').value = data.sender || '';
+
+      // alertCountries multi
+      const select = document.getElementById('alertCountries');
+      // clear selection
+      for (let i = 0; i < select.options.length; i++) {
+        select.options[i].selected = false;
+      }
+      if (!data.alertCountries || data.alertCountries.length === 0) {
+        // default to "ALL"
+        select.options[0].selected = true;
+      } else {
+        // Mark them selected
+        for (let i = 0; i < select.options.length; i++) {
+          let val = select.options[i].value;
+          if (data.alertCountries.includes(val)) {
+            select.options[i].selected = true;
+          }
         }
       }
     })
@@ -438,25 +493,30 @@ function loadSettings() {
     .finally(() => showLoading(false));
 }
 
+// Save settings when hit the save button
 function saveSettings(e) {
   e.preventDefault(); // prevent form submission
 
   showLoading(true);
   const lang = document.getElementById('languageSelect').value;
   const mail = document.getElementById('alertEmail').value;
-  const countries = document.getElementById('alertCountries').value;
 
-  let countryList = [];
-  if (!countries || countries.trim() === '') {
-    countryList.push('all');
-  } else {
-    countryList = countries.split(',').map(s => s.trim());
+  const select = document.getElementById('alertCountries');
+  let chosenCountries = [];
+  for (let i = 0; i < select.options.length; i++) {
+    if (select.options[i].selected) {
+      chosenCountries.push(select.options[i].value);
+    }
+  }
+  // If user selected "ALL", we override everything
+  if (chosenCountries.includes("ALL")) {
+    chosenCountries = ["all"];
   }
 
   const body = {
     language: lang,
-    alertEmail: mail,
-    alertCountries: countryList
+    sender: mail,
+    alertCountries: chosenCountries
   };
 
   fetch('/api/settings', {
@@ -464,41 +524,20 @@ function saveSettings(e) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(body)
   })
-  .then(res => res.json())
-  .then(data => {
-    if (data.error) {
-      alert('Error saving settings: ' + data.error);
-    } else {
-      alert(data.message || 'Settings saved');
-      if (data.needsRestart) {
-        // show the same "reload" banner used for filter changes
-        document.getElementById('reloadBanner').style.display = 'block';
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error saving settings: ' + data.error);
+      } else {
+        //alert(data.message || 'Settings saved');
+        console.log("Settings saved successfully. Reload needed? " + data.reloadNeeded);
+        if (data.reloadNeeded) {
+          document.getElementById('reloadBanner').style.display = 'block';
+        }
       }
-    }
-  })
-  .catch(err => {
-    alert('Error: ' + err);
-  })
-  .finally(() => showLoading(false));
-}
-
-function showSection(sectionId) {
-  // hide all sections
-  document.getElementById('dashboardSection').style.display = 'none';
-  document.getElementById('filterSection').style.display = 'none';
-  document.getElementById('settingsSection').style.display = 'none';
-
-  // show the requested section
-  document.getElementById(sectionId).style.display = 'block';
-
-  // If it's filterSection, load filters
-  if (sectionId === 'filterSection') {
-    showFilterSection();
-  }
-  // If it's settingsSection, load settings
-  if (sectionId === 'settingsSection') {
-    loadSettings();
-  }
+    })
+    .catch(err => alert('Error: ' + err))
+    .finally(() => showLoading(false));
 }
 
 // Load the list of filters from /api/filters
@@ -587,6 +626,35 @@ function showFilterSection() {
   loadFilters(); // fetch the filter list
   document.getElementById('testResults').innerHTML = '';
   document.getElementById('logLinesTextarea').value = '';
+}
+
+//*******************************************************************
+//*                     Reload fail2ban action :                    *
+//*******************************************************************
+
+// Reload Fail2ban
+function reloadFail2ban() {
+  if (!confirm("It can happen that some logs are not parsed during the reload of fail2ban. Reload Fail2ban now?")) return;
+  showLoading(true);
+  fetch('/api/fail2ban/reload', { method: 'POST' })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.error) {
+        alert("Error: " + data.error);
+      } else {
+        alert(data.message || "Fail2ban reloaded");
+        // Hide reload banner
+        document.getElementById('reloadBanner').style.display = 'none';
+        // Refresh data
+        return fetchSummary();
+      }
+    })
+    .catch(function(err) {
+      alert("Error: " + err);
+    })
+    .finally(function() {
+      showLoading(false);
+    });
 }
 
 </script>
