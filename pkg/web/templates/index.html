@@ -256,8 +256,17 @@ window.addEventListener('DOMContentLoaded', function() {
   checkReloadNeeded();
   fetchSummary().then(function() {
     showLoading(false);
+    initializeTooltips(); // Initialize tooltips after fetching and rendering
   });
 });
+
+// Function to initialize Bootstrap tooltips
+function initializeTooltips() {
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+    new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+}
 
 // Toggle the loading overlay (with !important)
 function showLoading(show) {
@@ -342,7 +351,7 @@ function renderDashboard(data) {
     html += '<p>No jails found.</p>';
   } else {
     html += ''
-      + '<h2>Overview</h2>'
+      + '<h2><span data-bs-toggle="tooltip" data-bs-placement="top" title="The Overview displays the currently enabled jails that you have added to your jail.local configuration.">Overview</span></h2>'
       + '<table class="table table-striped" id="jailsTable">'
       + '  <thead>'
       + '    <tr>'

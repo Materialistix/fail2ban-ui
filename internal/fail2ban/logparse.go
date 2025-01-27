@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	//"strings"
 	"time"
 )
 
@@ -68,32 +67,4 @@ func ParseBanLog(logPath string) (map[string][]BanEvent, error) {
 		return nil, err
 	}
 	return eventsByJail, nil
-}
-
-// GetLastFiveBans crawls the parse results to find the last 5 ban events overall.
-func GetLastFiveBans(eventsByJail map[string][]BanEvent) []BanEvent {
-	var allEvents []BanEvent
-	for _, events := range eventsByJail {
-		allEvents = append(allEvents, events...)
-	}
-
-	// Sort by time descending
-	// (We want the latest 5 ban events)
-	sortByTimeDesc(allEvents)
-
-	if len(allEvents) > 5 {
-		return allEvents[:5]
-	}
-	return allEvents
-}
-
-// A simple in-file sorting utility
-func sortByTimeDesc(events []BanEvent) {
-	for i := 0; i < len(events); i++ {
-		for j := i + 1; j < len(events); j++ {
-			if events[j].Time.After(events[i].Time) {
-				events[i], events[j] = events[j], events[i]
-			}
-		}
-	}
 }

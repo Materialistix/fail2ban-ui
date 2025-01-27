@@ -2,18 +2,18 @@ package fail2ban
 
 import (
 	"fmt"
-    "io/ioutil"
-    "os/exec"
-    "path/filepath"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
 type JailInfo struct {
-	JailName       string   `json:"jailName"`
-	TotalBanned    int      `json:"totalBanned"`
-	NewInLastHour  int      `json:"newInLastHour"`
-	BannedIPs      []string `json:"bannedIPs"`
+	JailName      string   `json:"jailName"`
+	TotalBanned   int      `json:"totalBanned"`
+	NewInLastHour int      `json:"newInLastHour"`
+	BannedIPs     []string `json:"bannedIPs"`
 }
 
 // GetJails returns all configured jails using "fail2ban-client status".
@@ -128,29 +128,29 @@ func BuildJailInfos(logPath string) ([]JailInfo, error) {
 // Example: we assume each jail config is at /etc/fail2ban/filter.d/<jail>.conf
 // Adapt this to your environment.
 func GetJailConfig(jail string) (string, error) {
-    configPath := filepath.Join("/etc/fail2ban/filter.d", jail+".conf")
-    content, err := ioutil.ReadFile(configPath)
-    if err != nil {
-        return "", fmt.Errorf("failed to read config for jail %s: %v", jail, err)
-    }
-    return string(content), nil
+	configPath := filepath.Join("/etc/fail2ban/filter.d", jail+".conf")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read config for jail %s: %v", jail, err)
+	}
+	return string(content), nil
 }
 
 // SetJailConfig overwrites the config file for a given jail with new content.
 func SetJailConfig(jail, newContent string) error {
-    configPath := filepath.Join("/etc/fail2ban/filter.d", jail+".conf")
-    if err := ioutil.WriteFile(configPath, []byte(newContent), 0644); err != nil {
-        return fmt.Errorf("failed to write config for jail %s: %v", jail, err)
-    }
-    return nil
+	configPath := filepath.Join("/etc/fail2ban/filter.d", jail+".conf")
+	if err := os.WriteFile(configPath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("failed to write config for jail %s: %v", jail, err)
+	}
+	return nil
 }
 
 // ReloadFail2ban runs "fail2ban-client reload"
 func ReloadFail2ban() error {
-    cmd := exec.Command("fail2ban-client", "reload")
-    out, err := cmd.CombinedOutput()
-    if err != nil {
-        return fmt.Errorf("fail2ban reload error: %v\nOutput: %s", err, out)
-    }
-    return nil
+	cmd := exec.Command("fail2ban-client", "reload")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("fail2ban reload error: %v\nOutput: %s", err, out)
+	}
+	return nil
 }
