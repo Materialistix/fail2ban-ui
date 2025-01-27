@@ -329,13 +329,21 @@ function fetchSummary() {
 function renderDashboard(data) {
   var html = "";
 
+  // Add a search bar
+  html += `
+  <div class="mb-3">
+    <label for="ipSearch" class="form-label">Search Banned IPs</label>
+    <input type="text" id="ipSearch" class="form-control" placeholder="Enter IP address to search" onkeyup="filterIPs()">
+  </div>
+  `;
+
   // Jails table
   if (!data.jails || data.jails.length === 0) {
     html += '<p>No jails found.</p>';
   } else {
     html += ''
       + '<h2>Overview</h2>'
-      + '<table class="table table-striped">'
+      + '<table class="table table-striped" id="jailsTable">'
       + '  <thead>'
       + '    <tr>'
       + '      <th>Jail Name</th>'
@@ -349,7 +357,7 @@ function renderDashboard(data) {
     data.jails.forEach(function(jail) {
       var bannedHTML = renderBannedIPs(jail.jailName, jail.bannedIPs);
       html += ''
-        + '<tr>'
+        + '<tr class="jail-row">'
         + '  <td>'
         + '    <a href="#" onclick="openJailConfigModal(\'' + jail.jailName + '\')">'
         +        jail.jailName
@@ -415,6 +423,39 @@ function renderBannedIPs(jailName, ips) {
   });
   content += '</ul>';
   return content;
+}
+
+// Filter IPs on dashboard table
+function filterIPs() {
+  const query = document.getElementById("ipSearch").value.toLowerCase(); // Get the search query
+  const rows = document.querySelectorAll("#jailsTable .jail-row"); // Get all jail rows
+
+  rows.forEach((row) => {
+    const ipSpans = row.querySelectorAll("ul li span"); // Find all IP span elements in this row
+    let matchFound = false; // Reset match flag for the row
+
+    ipSpans.forEach((span) => {
+      const originalText = span.textContent; // The full original text
+      const ipText = originalText.toLowerCase();
+
+      if (query && ipText.includes(query)) {
+        matchFound = true; // Match found in this row
+
+        // Highlight the matching part
+        const highlightedText = originalText.replace(
+          new RegExp(query, "gi"), // Case-insensitive match
+          (match) => `<mark>${match}</mark>` // Wrap match in <mark>
+        );
+        span.innerHTML = highlightedText; // Update span's HTML with highlighting
+      } else {
+        // Remove highlighting if no match or search is cleared
+        span.innerHTML = originalText;
+      }
+    });
+
+    // Show the row if a match is found or the query is empty
+    row.style.display = matchFound || !query ? "" : "none";
+  });
 }
 
 //*******************************************************************
