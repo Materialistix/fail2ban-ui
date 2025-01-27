@@ -103,8 +103,12 @@
 
 <!-- Settings Section -->
 <div id="settingsSection" style="display: none;" class="container my-4">
-    <h2>Settings</h2>
-    <form onsubmit="saveSettings(event)">
+  <h2>Settings</h2>
+  <form onsubmit="saveSettings(event)">
+    <!-- General Settings Group -->
+    <fieldset class="border p-3 rounded mb-4">
+      <legend class="w-auto px-2">General Settings</legend>
+      <!-- Language Selection -->
       <div class="mb-3">
         <label for="languageSelect" class="form-label">Language</label>
         <select id="languageSelect" class="form-select" disabled>
@@ -112,13 +116,31 @@
           <option value="de">Deutsch</option>
         </select>
       </div>
-      <div class="mb-3">
-        <label for="alertEmail" class="form-label">Alert Email</label>
-        <input type="email" class="form-control" id="alertEmail"/>
+      <!-- Debug Log Output -->
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="debugMode">
+        <label for="debugMode" class="form-check-label">Enable Debug Log</label>
       </div>
+    </fieldset>
+
+    <!-- Alert Settings Group -->
+    <fieldset class="border p-3 rounded mb-4">
+      <legend class="w-auto px-2">Alert Settings</legend>
+
+      <!-- Source Email -->
+      <div class="mb-3">
+        <label for="sourceEmail" class="form-label">Source Email - Emails are sent from this address.</label>
+        <input type="email" class="form-control" id="sourceEmail"/>
+      </div>
+      <!-- Destination Email -->
+      <div class="mb-3">
+        <label for="destEmail" class="form-label">Destination Email - Where to sent the alert messages?</label>
+        <input type="email" class="form-control" id="destEmail" placeholder="e.g., alerts@swissmakers.ch" />
+      </div>
+      <!-- Alert Countries -->
       <div class="mb-3">
         <label for="alertCountries" class="form-label">Select alert Countries</label>
-        <p class="text-muted">Choose which country-IP bans should trigger an email. With CTRL, you can select multiple.</p>
+        <p class="text-muted">Choose which country IP blocks should trigger an email. You can select multiple with CTRL.</p>
         <select id="alertCountries" class="form-select" multiple size="7">
           <option value="ALL">ALL (Every Country)</option>
           <option value="CH">Switzerland (CH)</option>
@@ -130,9 +152,41 @@
           <!-- Maybe i will add more later.. -->
         </select>
       </div>
-      <button type="submit" class="btn btn-primary">Save</button>
-    </form>
-  </div>
+    </fieldset>
+
+    <!-- Fail2Ban Configuration Group -->
+    <fieldset class="border p-3 rounded mb-4">
+      <legend class="w-auto px-2">Fail2Ban Configuration</legend>
+
+      <!-- Bantime Increment -->
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="bantimeIncrement" />
+        <label for="bantimeIncrement" class="form-check-label">Enable Bantime Increment</label>
+      </div>
+      <!-- Bantime -->
+      <div class="mb-3">
+        <label for="banTime" class="form-label">Default Bantime</label>
+        <input type="text" class="form-control" id="banTime" placeholder="e.g., 48h" />
+      </div>
+      <!-- Findtime -->
+      <div class="mb-3">
+        <label for="findTime" class="form-label">Default Findtime</label>
+        <input type="text" class="form-control" id="findTime" placeholder="e.g., 30m" />
+      </div>
+      <!-- Max Retry -->
+      <div class="mb-3">
+        <label for="maxRetry" class="form-label">Default Max Retry</label>
+        <input type="number" class="form-control" id="maxRetry" placeholder="Enter maximum retries" />
+      </div>
+      <!-- Ignore IPs -->
+      <div class="mb-3">
+        <label for="ignoreIP" class="form-label">Ignore IPs</label>
+        <textarea class="form-control" id="ignoreIP" rows="2" placeholder="Enter IPs to ignore, separated by spaces"></textarea>
+      </div>
+    </fieldset>  
+    <button type="submit" class="btn btn-primary">Save</button>
+  </form>
+</div>
 <!-- ******************************************************************* -->
 
 <!-- Footer -->
@@ -464,10 +518,13 @@ function loadSettings() {
   fetch('/api/settings')
     .then(res => res.json())
     .then(data => {
-      // populate language, email, etc...
+      // Get current general settings
       document.getElementById('languageSelect').value = data.language || 'en';
-      document.getElementById('alertEmail').value = data.sender || '';
+      document.getElementById('debugMode').checked = data.debug || false;
 
+      // Get current alert settings
+      document.getElementById('sourceEmail').value = data.sender || '';
+      document.getElementById('destEmail').value = data.destemail || '';
       // alertCountries multi
       const select = document.getElementById('alertCountries');
       // clear selection
@@ -486,6 +543,13 @@ function loadSettings() {
           }
         }
       }
+
+      // Get current Fail2Ban Configuration
+      document.getElementById('bantimeIncrement').checked = data.bantimeIncrement || false;
+      document.getElementById('banTime').value = data.bantime || '';
+      document.getElementById('findTime').value = data.findtime || '';
+      document.getElementById('maxRetry').value = data.maxretry || '';
+      document.getElementById('ignoreIP').value = data.ignoreip || '';
     })
     .catch(err => {
       alert('Error loading settings: ' + err);
@@ -499,7 +563,9 @@ function saveSettings(e) {
 
   showLoading(true);
   const lang = document.getElementById('languageSelect').value;
-  const mail = document.getElementById('alertEmail').value;
+  const debugMode = document.getElementById("debugMode").checked;
+  const srcmail = document.getElementById('sourceEmail').value;
+  const destmail = document.getElementById('destEmail').value;
 
   const select = document.getElementById('alertCountries');
   let chosenCountries = [];
@@ -513,10 +579,23 @@ function saveSettings(e) {
     chosenCountries = ["all"];
   }
 
+  const bantimeinc = document.getElementById('bantimeIncrement').checked;
+  const bant = document.getElementById('banTime').value;
+  const findt = document.getElementById('findTime').value;
+  const maxre = parseInt(document.getElementById('maxRetry').value, 10) || 1; // Default to 1 (if parsing fails)
+  const ignip = document.getElementById('ignoreIP').value;
+
   const body = {
     language: lang,
-    sender: mail,
-    alertCountries: chosenCountries
+    debug: debugMode,
+    sender: srcmail,
+    destemail: destmail,
+    alertCountries: chosenCountries,
+    bantimeIncrement: bantimeinc,
+    bantime: bant,
+    findtime: findt,
+    maxretry: maxre,
+    ignoreip: ignip
   };
 
   fetch('/api/settings', {
@@ -527,7 +606,7 @@ function saveSettings(e) {
     .then(res => res.json())
     .then(data => {
       if (data.error) {
-        alert('Error saving settings: ' + data.error);
+        alert('Error saving settings: ' + data.error + data.details);
       } else {
         //alert(data.message || 'Settings saved');
         console.log("Settings saved successfully. Reload needed? " + data.reloadNeeded);
@@ -642,7 +721,6 @@ function reloadFail2ban() {
       if (data.error) {
         alert("Error: " + data.error);
       } else {
-        alert(data.message || "Fail2ban reloaded");
         // Hide reload banner
         document.getElementById('reloadBanner').style.display = 'none';
         // Refresh data

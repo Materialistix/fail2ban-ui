@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 )
@@ -11,6 +12,7 @@ import (
 // relevant Fail2ban jail/local config options.
 type AppSettings struct {
 	Language       string   `json:"language"`
+	Debug          bool     `json:"debug"`
 	ReloadNeeded   bool     `json:"reloadNeeded"`
 	AlertCountries []string `json:"alertCountries"`
 
@@ -56,6 +58,7 @@ func setDefaults() {
 
 	currentSettings = AppSettings{
 		Language:       "en",
+		Debug:          false,
 		ReloadNeeded:   false,
 		AlertCountries: []string{"all"},
 
@@ -71,6 +74,8 @@ func setDefaults() {
 
 // loadSettings reads the file (if exists) into currentSettings
 func loadSettings() error {
+	fmt.Println("----------------------------")
+	fmt.Println("loadSettings called (settings.go)") // entry point
 	data, err := os.ReadFile(settingsFile)
 	if os.IsNotExist(err) {
 		return err // triggers setDefaults + save
@@ -92,14 +97,23 @@ func loadSettings() error {
 
 // saveSettings writes currentSettings to JSON
 func saveSettings() error {
-	settingsLock.RLock()
-	defer settingsLock.RUnlock()
+	fmt.Println("----------------------------")
+	fmt.Println("saveSettings called (settings.go)") // entry point
 
 	b, err := json.MarshalIndent(currentSettings, "", "  ")
 	if err != nil {
+		fmt.Println("Error marshalling settings:", err) // Debug
 		return err
 	}
-	return os.WriteFile(settingsFile, b, 0644)
+	fmt.Println("Settings marshaled, writing to file...") // Log marshaling success
+	//return os.WriteFile(settingsFile, b, 0644)
+	err = os.WriteFile(settingsFile, b, 0644)
+	if err != nil {
+		log.Println("Error writing to file:", err) // Debug
+	} else {
+		log.Println("Settings saved successfully!") // Debug
+	}
+	return nil
 }
 
 // GetSettings returns a copy of the current settings
@@ -132,6 +146,8 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 	settingsLock.Lock()
 	defer settingsLock.Unlock()
 
+	fmt.Println("Locked settings for update") // Log lock acquisition
+
 	old := currentSettings
 
 	// If certain fields change, we mark reload needed
@@ -154,11 +170,14 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 	}
 
 	currentSettings = new
+	fmt.Println("New settings applied:", currentSettings) // Log settings applied
 
 	// persist to file
 	if err := saveSettings(); err != nil {
+		fmt.Println("Error saving settings:", err) // Log save error
 		return currentSettings, err
 	}
+	fmt.Println("Settings saved to file successfully") // Log save success
 	return currentSettings, nil
 }
 
