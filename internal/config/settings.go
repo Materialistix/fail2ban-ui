@@ -233,28 +233,9 @@ action_mwlg = %(action_)s
 
 // writeFail2banAction creates or updates the action file with the AlertCountries.
 func writeFail2banAction(alertCountries []string) error {
-	// If "all" is included in AlertCountries, allow all countries
-	if len(alertCountries) == 1 && strings.ToLower(alertCountries[0]) == "all" {
-		alertCountries = []string{"CH DE IT FR UK US"} // Match everything
-	}
 
-	// Convert country list into properly formatted Python set syntax
-	//countries := strings.Join(alertCountries, "','")
-	//countriesFormatted := fmt.Sprintf("'%s'", countries)
-
-	// Convert country list into properly formatted Bash syntax
-	countries := strings.Join(alertCountries, "' '")
-	countriesFormatted := fmt.Sprintf("' %s '", countries)
-
-	//actionConfig := `[Definition]
-	//actionstart =
-	//actionban = python3 -c '
-	//import sys
-	//from geoip import geolite2
-	//country = geolite2.lookup(sys.argv[1]).country
-	//if country in {{ALERT_COUNTRIES}}:
-	//    sys.exit(0)  # Send alert
-	//sys.exit(1)  # Do not send alert'
+	// Join the alertCountries into a comma-separated string
+	countriesFormatted := strings.Join(alertCountries, ",")
 
 	// Define the Fail2Ban action file content
 	actionConfig := fmt.Sprintf(`[INCLUDES]
@@ -265,47 +246,49 @@ before = sendmail-common.conf
 
 [Definition]
 
-# bypass ban/unban for restored tickets
+# Bypass ban/unban for restored tickets
 norestored = 1
 
-# Option:  actionban
-# Notes.:  command executed when banning an IP. Take care that the
-#          command is executed with Fail2Ban user rights.
-
-actionban = bash -c '
-	COUNTRY="<geoip_cc>"
-    if [[ " %s " =~ " $COUNTRY " ]]; then
-        ( printf %%%%b "Subject: [Fail2Ban] <name>: banned <ip> from <fq-hostname>\n"
-        printf "Date: `+"`LC_ALL=C date +\"%%%%a, %%%%d %%%%h %%%%Y %%%%T %%%%z\"`"+`\n"
-        printf "From: <sendername> <<sender>>\n"
-        printf "To: <dest>\n\n"
-        printf "Hi,\n"
-        printf "The IP <ip> has just been banned by Fail2Ban after <failures> attempts against <name>.\n\n"
-        printf "Here is more information about <ip>:\n"
-        printf "%%%%(_whois_command)s\n"
-        printf "\nLines containing failures of <ip> (max <grepmax>)\n"
-        printf "%%%%(_grep_logs)s\n"
-        printf "\n\nRegards,\nFail2Ban\n"
-        ) | <mailcmd>
-    fi'
+# Option: actionban
+# This executes the Python script with <ip> and the list of allowed countries.
+# If the country matches the allowed list, it sends the email.
+actionban = /etc/fail2ban/scripts/check_geoip.py <ip> "%s" && ( 
+            printf %%%%b "Subject: [Fail2Ban] <name>: banned <ip> from <fq-hostname>
+            Date: `+"`LC_ALL=C date +\"%%%%a, %%%%d %%%%h %%%%Y %%%%T %%%%z\"`"+`
+            From: <sendername> <<sender>>
+            To: <dest>\n
+            Hi,\n
+            The IP <ip> has just been banned by Fail2Ban after <failures> attempts against <name>.\n\n
+            Here is more information about <ip>:\n"
+            %%(_whois_command)s;
+            printf %%%%b "\nLines containing failures of <ip> (max <grepmax>)\n";
+            %%(_grep_logs)s;
+            printf %%%%b "\n
+            Regards,\n
+            Fail2Ban" ) | <mailcmd>
 
 [Init]
 
 # Default name of the chain
-#
 name = default
 
-# Path to the log files which contain relevant lines for the abuser IP
-#
+# Path to log files containing relevant lines for the abuser IP
 logpath = /dev/null
 
 # Number of log lines to include in the email
-#
-#grepmax = 1000
-#grepopts = -m <grepmax>
+# grepmax = 1000
+# grepopts = -m <grepmax>
 `, countriesFormatted)
 
-	return os.WriteFile(actionFile, []byte(actionConfig), 0644)
+	// Write the action file
+	//actionFilePath := "/etc/fail2ban/action.d/ui-custom-action.conf"
+	err := os.WriteFile(actionFile, []byte(actionConfig), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write action file: %w", err)
+	}
+
+	fmt.Printf("Action file successfully written to %s\n", actionFile)
+	return nil
 }
 
 // loadSettings reads fail2ban-ui-settings.json into currentSettings.
