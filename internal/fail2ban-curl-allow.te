@@ -1,0 +1,11 @@
+
+module fail2ban-curl-allow 1.0;
+
+require {
+	type fail2ban_t;
+	type http_cache_port_t;
+	class tcp_socket name_connect;
+}
+
+#============= fail2ban_t ==============
+allow fail2ban_t http_cache_port_t:tcp_socket name_connect;
