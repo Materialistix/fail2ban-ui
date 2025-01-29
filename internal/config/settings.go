@@ -1,3 +1,19 @@
+// Fail2ban UI - A Swiss made, management interface for Fail2ban.
+//
+// Copyright (C) 2025 Swissmakers GmbH (https://swissmakers.ch)
+//
+// Licensed under the GNU General Public License, Version 3 (GPL-3.0)
+// You may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.gnu.org/licenses/gpl-3.0.en.html
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package config
 
 import (
@@ -252,20 +268,7 @@ norestored = 1
 # Option: actionban
 # This executes the Python script with <ip> and the list of allowed countries.
 # If the country matches the allowed list, it sends the email.
-actionban = /etc/fail2ban/scripts/check_geoip.py <ip> "%s" && ( 
-            printf %%%%b "Subject: [Fail2Ban] <name>: banned <ip> from <fq-hostname>
-            Date: `+"`LC_ALL=C date +\"%%%%a, %%%%d %%%%h %%%%Y %%%%T %%%%z\"`"+`
-            From: <sendername> <<sender>>
-            To: <dest>\n
-            Hi,\n
-            The IP <ip> has just been banned by Fail2Ban after <failures> attempts against <name>.\n\n
-            Here is more information about <ip>:\n"
-            %%(_whois_command)s;
-            printf %%%%b "\nLines containing failures of <ip> (max <grepmax>)\n";
-            %%(_grep_logs)s;
-            printf %%%%b "\n
-            Regards,\n
-            Fail2Ban" ) | <mailcmd>
+actionban = /etc/fail2ban/action.d/geoip_notify.py <ip> "%s" 'name=<name>;ip=<ip>;fq-hostname=<fq-hostname>;sendername=<sendername>;sender=<sender>;dest=<dest>;failures=<failures>;_whois_command=%%(_whois_command)s;_grep_logs=%%(_grep_logs)s;grepmax=<grepmax>;mailcmd=<mailcmd>'
 
 [Init]
 
@@ -281,7 +284,6 @@ logpath = /dev/null
 `, countriesFormatted)
 
 	// Write the action file
-	//actionFilePath := "/etc/fail2ban/action.d/ui-custom-action.conf"
 	err := os.WriteFile(actionFile, []byte(actionConfig), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write action file: %w", err)
