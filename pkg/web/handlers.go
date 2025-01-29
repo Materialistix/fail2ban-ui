@@ -17,13 +17,18 @@
 package web
 
 import (
+	"bytes"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oschwald/maxminddb-golang"
 	"github.com/swissmakers/fail2ban-ui/internal/config"
 	"github.com/swissmakers/fail2ban-ui/internal/fail2ban"
 )
@@ -89,6 +94,139 @@ func UnbanIPHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "IP unbanned successfully",
 	})
+}
+
+// BanNotificationHandler processes incoming ban notifications from Fail2Ban.
+func BanNotificationHandler(c *gin.Context) {
+	var request struct {
+		IP       string `json:"ip" binding:"required"`
+		Jail     string `json:"jail" binding:"required"`
+		Hostname string `json:"hostname"`
+		Failures string `json:"failures"`
+		Whois    string `json:"whois"`
+		Logs     string `json:"logs"`
+	}
+
+	// Parse JSON request body
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	// Handle the Fail2Ban notification
+	if err := HandleBanNotification(request.IP, request.Jail, request.Hostname, request.Failures, request.Whois, request.Logs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process ban notification: " + err.Error()})
+		return
+	}
+
+	// Respond with success
+	c.JSON(http.StatusOK, gin.H{"message": "Ban notification processed successfully"})
+}
+
+// HandleBanNotification processes Fail2Ban notifications, checks geo-location, and sends alerts.
+func HandleBanNotification(ip, jail, hostname, failures, whois, logs string) error {
+	// Load settings to get alert countries
+	settings := config.GetSettings()
+
+	// Lookup the country for the given IP
+	country, err := lookupCountry(ip)
+	if err != nil {
+		log.Printf("⚠️ GeoIP lookup failed for IP %s: %v", ip, err)
+		return err
+	}
+
+	// Check if country is in alert list
+	if !shouldAlertForCountry(country, settings.AlertCountries) {
+		log.Printf("❌ IP %s belongs to %s, which is NOT in alert countries (%v). No alert sent.", ip, country, settings.AlertCountries)
+		return nil
+	}
+
+	// Send email notification
+	if err := sendBanAlert(ip, jail, hostname, failures, whois, logs, country, settings); err != nil {
+		log.Printf("❌ Failed to send alert email: %v", err)
+		return err
+	}
+
+	log.Printf("✅ Email alert sent for banned IP %s (%s)", ip, country)
+	return nil
+}
+
+// lookupCountry finds the country ISO code for a given IP using MaxMind GeoLite2 database.
+func lookupCountry(ip string) (string, error) {
+	// Convert the IP string to net.IP
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return "", fmt.Errorf("invalid IP address: %s", ip)
+	}
+
+	// Open the GeoIP database
+	db, err := maxminddb.Open("/usr/share/GeoIP/GeoLite2-Country.mmdb")
+	if err != nil {
+		return "", fmt.Errorf("failed to open GeoIP database: %w", err)
+	}
+	defer db.Close()
+
+	// Define the structure to store the lookup result
+	var record struct {
+		Country struct {
+			ISOCode string `maxminddb:"iso_code"`
+		} `maxminddb:"country"`
+	}
+
+	// Perform the lookup using net.IP type
+	if err := db.Lookup(parsedIP, &record); err != nil {
+		return "", fmt.Errorf("GeoIP lookup error: %w", err)
+	}
+
+	// Return the country code
+	return record.Country.ISOCode, nil
+}
+
+// shouldAlertForCountry checks if an IP’s country is in the allowed alert list.
+func shouldAlertForCountry(country string, alertCountries []string) bool {
+	if len(alertCountries) == 0 || strings.Contains(strings.Join(alertCountries, ","), "ALL") {
+		return true // If "ALL" is selected, alert for all bans
+	}
+	for _, c := range alertCountries {
+		if strings.EqualFold(country, c) {
+			return true
+		}
+	}
+	return false
+}
+
+// sendBanAlert sends an email notification for a banned IP.
+func sendBanAlert(ip, jail, hostname, failures, whois, logs, country string, settings config.AppSettings) error {
+	// Construct email content
+	emailBody := fmt.Sprintf(`Subject: [Fail2Ban] %s: banned %s from %s
+Date: `+"`LC_ALL=C date +\"%%a, %%d %%h %%Y %%T %%z\"`"+`
+From: %s <%s>
+To: %s
+
+Hi,
+
+The IP %s has just been banned by Fail2Ban after %s attempts against %s.
+
+📍 Country: %s
+🔍 Whois Info: 
+%s
+
+📄 Log Entries:
+%s
+
+Best Regards,
+Fail2Ban
+`, jail, ip, hostname, settings.Sender, settings.Sender, settings.Destemail, ip, failures, jail, country, whois, logs)
+
+	// Use msmtp or sendmail to send email
+	cmd := exec.Command("/usr/sbin/sendmail", "-f", settings.Sender, settings.Destemail)
+	cmd.Stdin = bytes.NewBufferString(emailBody)
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	return nil
 }
 
 func sortByTimeDesc(events []fail2ban.BanEvent) {

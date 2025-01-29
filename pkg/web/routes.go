@@ -46,5 +46,8 @@ func RegisterRoutes(r *gin.Engine) {
 
 		// Reload endpoint
 		api.POST("/fail2ban/reload", ReloadFail2banHandler)
+
+		// Handle Fail2Ban notifications
+		api.POST("/ban", BanNotificationHandler)
 	}
 }

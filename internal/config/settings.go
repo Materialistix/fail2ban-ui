@@ -169,7 +169,7 @@ func initializeFail2banAction() error {
 		fmt.Println("Error setting up jail.d configuration:", err)
 	}
 	// Write the fail2ban action file
-	return writeFail2banAction(currentSettings.AlertCountries)
+	return writeFail2banAction()
 }
 
 // setupGeoCustomAction checks and replaces the default action in jail.local with our from fail2ban-UI
@@ -248,13 +248,9 @@ action_mwlg = %(action_)s
 }
 
 // writeFail2banAction creates or updates the action file with the AlertCountries.
-func writeFail2banAction(alertCountries []string) error {
-
-	// Join the alertCountries into a comma-separated string
-	countriesFormatted := strings.Join(alertCountries, ",")
-
+func writeFail2banAction() error {
 	// Define the Fail2Ban action file content
-	actionConfig := fmt.Sprintf(`[INCLUDES]
+	actionConfig := `[INCLUDES]
 
 before = sendmail-common.conf
          mail-whois-common.conf
@@ -266,9 +262,16 @@ before = sendmail-common.conf
 norestored = 1
 
 # Option: actionban
-# This executes the Python script with <ip> and the list of allowed countries.
-# If the country matches the allowed list, it sends the email.
-actionban = /etc/fail2ban/action.d/geoip_notify.py <ip> "%s" 'name=<name>;ip=<ip>;fq-hostname=<fq-hostname>;sendername=<sendername>;sender=<sender>;dest=<dest>;failures=<failures>;_whois_command=%%(_whois_command)s;_grep_logs=%%(_grep_logs)s;grepmax=<grepmax>;mailcmd=<mailcmd>'
+# This executes a cURL request to notify our API when an IP is banned.
+
+actionban = /usr/bin/curl -X POST http://127.0.0.1:8080/api/ban \
+     -H "Content-Type: application/json" \
+     -d "{\"ip\": \"<ip>\", \
+          \"jail\": \"<name>\", \
+          \"hostname\": \"<fq-hostname>\", \
+          \"failures\": \"<failures>\", \
+          \"whois\": \"%%(_whois_command)s\", \
+          \"logs\": \"%%(_grep_logs)s\"}"
 
 [Init]
 
@@ -280,8 +283,7 @@ logpath = /dev/null
 
 # Number of log lines to include in the email
 # grepmax = 1000
-# grepopts = -m <grepmax>
-`, countriesFormatted)
+# grepopts = -m <grepmax>`
 
 	// Write the action file
 	err := os.WriteFile(actionFile, []byte(actionConfig), 0644)
@@ -335,7 +337,7 @@ func saveSettings() error {
 		log.Println("Settings saved successfully!") // Debug
 	}
 	// Update the Fail2ban action file
-	return writeFail2banAction(currentSettings.AlertCountries)
+	return writeFail2banAction()
 }
 
 // GetSettings returns a copy of the current settings
