@@ -1,6 +1,6 @@
 # Fail2ban UI
 
-A **Go**-powered, **single-page** web interface for [Fail2ban](https://www.fail2ban.org/).  
+A Swissmade, management interface for [Fail2ban](https://www.fail2ban.org/).
 It provides a modern dashboard to currently:
 
 - View all Fail2ban jails and banned IPs
@@ -8,6 +8,7 @@ It provides a modern dashboard to currently:
 - Edit and save jail/filter configs
 - Reload Fail2ban when needed
 - See recent ban events
+- More to come...
 
 Built by [Swissmakers GmbH](https://swissmakers.ch).
 

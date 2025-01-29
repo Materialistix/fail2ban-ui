@@ -1,3 +1,19 @@
+// Fail2ban UI - A Swiss made, management interface for Fail2ban.
+//
+// Copyright (C) 2025 Swissmakers GmbH (https://swissmakers.ch)
+//
+// Licensed under the GNU General Public License, Version 3 (GPL-3.0)
+// You may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.gnu.org/licenses/gpl-3.0.en.html
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package fail2ban
 
 import (
@@ -5,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	//"strings"
 	"time"
 )
 
@@ -68,32 +83,4 @@ func ParseBanLog(logPath string) (map[string][]BanEvent, error) {
 		return nil, err
 	}
 	return eventsByJail, nil
-}
-
-// GetLastFiveBans crawls the parse results to find the last 5 ban events overall.
-func GetLastFiveBans(eventsByJail map[string][]BanEvent) []BanEvent {
-	var allEvents []BanEvent
-	for _, events := range eventsByJail {
-		allEvents = append(allEvents, events...)
-	}
-
-	// Sort by time descending
-	// (We want the latest 5 ban events)
-	sortByTimeDesc(allEvents)
-
-	if len(allEvents) > 5 {
-		return allEvents[:5]
-	}
-	return allEvents
-}
-
-// A simple in-file sorting utility
-func sortByTimeDesc(events []BanEvent) {
-	for i := 0; i < len(events); i++ {
-		for j := i + 1; j < len(events); j++ {
-			if events[j].Time.After(events[i].Time) {
-				events[i], events[j] = events[j], events[i]
-			}
-		}
-	}
 }

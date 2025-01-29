@@ -16,7 +16,7 @@ func main() {
 	// Register our routes (IndexHandler, /api/summary, /api/jails/:jail/unban/:ip)
 	web.RegisterRoutes(r)
 
-	log.Println("Starting Fail2ban UI on :8080. Run with 'sudo' if fail2ban-client requires it.")
+	log.Println("Starting Fail2ban-UI server on :8080.")
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("Server crashed: %v", err)
 	}

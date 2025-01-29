@@ -1,7 +1,26 @@
+<!--
+  Fail2ban UI - A Swiss made, management interface for Fail2ban.
+
+  Copyright (C) 2025 Swissmakers GmbH
+
+  Licensed under the GNU General Public License, Version 3 (GPL-3.0)
+  You may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      https://www.gnu.org/licenses/gpl-3.0.en.html
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Fail2ban UI Dashboard</title>
   <!-- Bootstrap 5 (CDN) -->
   <link 
@@ -30,15 +49,38 @@
     }
   </style>
 </head>
+
 <body class="bg-light">
-<!-- NavBar -->
+<!-- ******************************************************************* -->
+<!--                            NAVIGATION :                             -->
+<!-- ******************************************************************* -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">
-      <strong>Fail2ban UI</strong>
-    </a>
-  </div>
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">
+        <strong>Fail2ban UI</strong>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+        data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+        aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+  
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="showSection('dashboardSection')">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="showSection('filterSection')">Filter Debug</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="showSection('settingsSection')">Settings</a>
+          </li>
+        </ul>
+      </div>
+    </div>
 </nav>
+<!-- ******************************************************************* -->
 
 <!-- Reload Banner -->
 <div id="reloadBanner" class="bg-warning text-dark p-3 text-center">
@@ -48,10 +90,121 @@
   </button>
 </div>
 
-<div class="container my-4">
+<!-- ******************************************************************* -->
+<!--                       APP Sections (Pages) :                        -->
+<!-- ******************************************************************* -->
+
+<!-- Dashboard Section -->
+<div id="dashboardSection" class="container my-4">
   <h1 class="mb-4">Dashboard</h1>
   <div id="dashboard"></div>
 </div>
+
+<!-- Filter Debug Section -->
+<div id="filterSection" style="display: none;" class="container my-4">
+  <h2>Filter Debug</h2>
+  <!-- Dropdown of available jail/filters -->
+  <div class="mb-3">
+    <label for="filterSelect" class="form-label">Select a Filter</label>
+    <select id="filterSelect" class="form-select"></select>
+  </div>
+  <!-- Textarea for log lines to test -->
+  <div class="mb-3">
+    <label class="form-label">Log Lines</label>
+    <textarea id="logLinesTextarea" class="form-control" rows="6" disabled></textarea>
+  </div>
+  <button class="btn btn-secondary" onclick="testSelectedFilter()">Test Filter</button>
+  <hr/>
+  <div id="testResults"></div>
+</div> 
+
+<!-- Settings Section -->
+<div id="settingsSection" style="display: none;" class="container my-4">
+  <h2>Settings</h2>
+  <form onsubmit="saveSettings(event)">
+    <!-- General Settings Group -->
+    <fieldset class="border p-3 rounded mb-4">
+      <legend class="w-auto px-2">General Settings</legend>
+      <!-- Language Selection -->
+      <div class="mb-3">
+        <label for="languageSelect" class="form-label">Language</label>
+        <select id="languageSelect" class="form-select" disabled>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </div>
+      <!-- Debug Log Output -->
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="debugMode">
+        <label for="debugMode" class="form-check-label">Enable Debug Log</label>
+      </div>
+    </fieldset>
+
+    <!-- Alert Settings Group -->
+    <fieldset class="border p-3 rounded mb-4">
+      <legend class="w-auto px-2">Alert Settings</legend>
+
+      <!-- Source Email -->
+      <div class="mb-3">
+        <label for="sourceEmail" class="form-label">Source Email - Emails are sent from this address.</label>
+        <input type="email" class="form-control" id="sourceEmail"/>
+      </div>
+      <!-- Destination Email -->
+      <div class="mb-3">
+        <label for="destEmail" class="form-label">Destination Email - Where to sent the alert messages?</label>
+        <input type="email" class="form-control" id="destEmail" placeholder="e.g., alerts@swissmakers.ch" />
+      </div>
+      <!-- Alert Countries -->
+      <div class="mb-3">
+        <label for="alertCountries" class="form-label">Select alert Countries</label>
+        <p class="text-muted">Choose which country IP blocks should trigger an email. You can select multiple with CTRL.</p>
+        <select id="alertCountries" class="form-select" multiple size="7">
+          <option value="ALL">ALL (Every Country)</option>
+          <option value="CH">Switzerland (CH)</option>
+          <option value="DE">Germany (DE)</option>
+          <option value="IT">Italy (IT)</option>
+          <option value="FR">France (FR)</option>
+          <option value="UK">England (UK)</option>
+          <option value="US">United States (US)</option>
+          <!-- Maybe i will add more later.. -->
+        </select>
+      </div>
+    </fieldset>
+
+    <!-- Fail2Ban Configuration Group -->
+    <fieldset class="border p-3 rounded mb-4">
+      <legend class="w-auto px-2">Fail2Ban Configuration</legend>
+
+      <!-- Bantime Increment -->
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="bantimeIncrement" />
+        <label for="bantimeIncrement" class="form-check-label">Enable Bantime Increment</label>
+      </div>
+      <!-- Bantime -->
+      <div class="mb-3">
+        <label for="banTime" class="form-label">Default Bantime</label>
+        <input type="text" class="form-control" id="banTime" placeholder="e.g., 48h" />
+      </div>
+      <!-- Findtime -->
+      <div class="mb-3">
+        <label for="findTime" class="form-label">Default Findtime</label>
+        <input type="text" class="form-control" id="findTime" placeholder="e.g., 30m" />
+      </div>
+      <!-- Max Retry -->
+      <div class="mb-3">
+        <label for="maxRetry" class="form-label">Default Max Retry</label>
+        <input type="number" class="form-control" id="maxRetry" placeholder="Enter maximum retries" />
+      </div>
+      <!-- Ignore IPs -->
+      <div class="mb-3">
+        <label for="ignoreIP" class="form-label">Ignore IPs</label>
+        <textarea class="form-control" id="ignoreIP" rows="2" placeholder="Enter IPs to ignore, separated by spaces"></textarea>
+      </div>
+    </fieldset>  
+    <button type="submit" class="btn btn-primary">Save</button>
+  </form>
+</div>
+<!-- ******************************************************************* -->
 
 <!-- Footer -->
 <footer class="text-center mt-4 mb-4">
@@ -64,6 +217,9 @@
   </p>
 </footer>
 
+<!-- ******************************************************************* -->
+<!--                       APP Components (HTML) :                       -->
+<!-- ******************************************************************* -->
 <!-- Loading Overlay -->
 <div id="loading-overlay" class="d-flex">
   <div class="spinner-border text-light" role="status">
@@ -95,6 +251,7 @@
     </div>
   </div>
 </div>
+<!-- ******************************************************************* -->
 
 <!-- Bootstrap 5 JS (for modal, etc.) -->
 <script 
@@ -102,11 +259,31 @@
 </script>
 
 <script>
+// For information: We avoid ES6 backticks in our JS, to prevent confusion with the Go template parser.
 "use strict";
 
-// We avoid ES6 backticks here to prevent confusion with the Go template parser.
+//*******************************************************************
+//*                 Init page and main-components :                 *
+//*******************************************************************
 
+// Init and run first function, when DOM is ready
 var currentJailForConfig = null;
+window.addEventListener('DOMContentLoaded', function() {
+  showLoading(true);
+  checkReloadNeeded();
+  fetchSummary().then(function() {
+    showLoading(false);
+    initializeTooltips(); // Initialize tooltips after fetching and rendering
+  });
+});
+
+// Function to initialize Bootstrap tooltips
+function initializeTooltips() {
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+    new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+}
 
 // Toggle the loading overlay (with !important)
 function showLoading(show) {
@@ -118,12 +295,43 @@ function showLoading(show) {
   }
 }
 
-window.addEventListener('DOMContentLoaded', function() {
-  showLoading(true);
-  fetchSummary().then(function() {
-    showLoading(false);
-  });
-});
+// Check if there is still a reload of the fail2ban service needed
+function checkReloadNeeded() {
+  fetch('/api/settings')
+    .then(res => res.json())
+    .then(data => {
+      if (data.reloadNeeded) {
+        document.getElementById('reloadBanner').style.display = 'block';
+      } else {
+        document.getElementById('reloadBanner').style.display = 'none';
+      }
+    })
+    .catch(err => console.error('Error checking reloadNeeded:', err));
+}
+
+// Load dynamically the other pages when navigating in nav
+function showSection(sectionId) {
+  // hide all sections
+  document.getElementById('dashboardSection').style.display = 'none';
+  document.getElementById('filterSection').style.display = 'none';
+  document.getElementById('settingsSection').style.display = 'none';
+
+  // show the requested section
+  document.getElementById(sectionId).style.display = 'block';
+
+  // If it's filterSection, load filters
+  if (sectionId === 'filterSection') {
+    showFilterSection();
+  }
+  // If it's settingsSection, load settings
+  if (sectionId === 'settingsSection') {
+    loadSettings();
+  }
+}
+
+//*******************************************************************
+//*               Fetch data and render dashboard :                 *
+//*******************************************************************
 
 // Fetch summary (jails, stats, last 5 bans)
 function fetchSummary() {
@@ -147,18 +355,26 @@ function fetchSummary() {
 function renderDashboard(data) {
   var html = "";
 
+  // Add a search bar
+  html += `
+  <div class="mb-3">
+    <label for="ipSearch" class="form-label">Search Banned IPs</label>
+    <input type="text" id="ipSearch" class="form-control" placeholder="Enter IP address to search" onkeyup="filterIPs()">
+  </div>
+  `;
+
   // Jails table
   if (!data.jails || data.jails.length === 0) {
     html += '<p>No jails found.</p>';
   } else {
     html += ''
-      + '<h2>Overview</h2>'
-      + '<table class="table table-striped">'
+      + '<h2><span data-bs-toggle="tooltip" data-bs-placement="top" title="The Overview displays the currently enabled jails that you have added to your jail.local configuration.">Overview</span></h2>'
+      + '<table class="table table-striped" id="jailsTable">'
       + '  <thead>'
       + '    <tr>'
       + '      <th>Jail Name</th>'
       + '      <th>Total Banned</th>'
-      + '      <th>New in Last Hour</th>'
+      + '      <th>New Last Hour</th>'
       + '      <th>Banned IPs (Unban)</th>'
       + '    </tr>'
       + '  </thead>'
@@ -167,7 +383,7 @@ function renderDashboard(data) {
     data.jails.forEach(function(jail) {
       var bannedHTML = renderBannedIPs(jail.jailName, jail.bannedIPs);
       html += ''
-        + '<tr>'
+        + '<tr class="jail-row">'
         + '  <td>'
         + '    <a href="#" onclick="openJailConfigModal(\'' + jail.jailName + '\')">'
         +        jail.jailName
@@ -235,6 +451,43 @@ function renderBannedIPs(jailName, ips) {
   return content;
 }
 
+// Filter IPs on dashboard table
+function filterIPs() {
+  const query = document.getElementById("ipSearch").value.toLowerCase(); // Get the search query
+  const rows = document.querySelectorAll("#jailsTable .jail-row"); // Get all jail rows
+
+  rows.forEach((row) => {
+    const ipSpans = row.querySelectorAll("ul li span"); // Find all IP span elements in this row
+    let matchFound = false; // Reset match flag for the row
+
+    ipSpans.forEach((span) => {
+      const originalText = span.textContent; // The full original text
+      const ipText = originalText.toLowerCase();
+
+      if (query && ipText.includes(query)) {
+        matchFound = true; // Match found in this row
+
+        // Highlight the matching part
+        const highlightedText = originalText.replace(
+          new RegExp(query, "gi"), // Case-insensitive match
+          (match) => `<mark>${match}</mark>` // Wrap match in <mark>
+        );
+        span.innerHTML = highlightedText; // Update span's HTML with highlighting
+      } else {
+        // Remove highlighting if no match or search is cleared
+        span.innerHTML = originalText;
+      }
+    });
+
+    // Show the row if a match is found or the query is empty
+    row.style.display = matchFound || !query ? "" : "none";
+  });
+}
+
+//*******************************************************************
+//*                  Functions to manage IP-bans :                  *
+//*******************************************************************
+
 // Unban IP
 function unbanIP(jail, ip) {
   if (!confirm("Unban IP " + ip + " from jail " + jail + "?")) {
@@ -247,7 +500,7 @@ function unbanIP(jail, ip) {
       if (data.error) {
         alert("Error: " + data.error);
       } else {
-        alert(data.message || "IP unbanned");
+        alert(data.message || "IP unbanned successfully");
       }
       return fetchSummary();
     })
@@ -259,7 +512,11 @@ function unbanIP(jail, ip) {
     });
 }
 
-// Open the jail config modal
+//*******************************************************************
+//*                Filter-mod and config-mod actions :              *
+//*******************************************************************
+
+// Open jail/filter modal and load filter-config
 function openJailConfigModal(jailName) {
   currentJailForConfig = jailName;
   var textArea = document.getElementById('jailConfigTextarea');
@@ -288,7 +545,7 @@ function openJailConfigModal(jailName) {
     });
 }
 
-// Save jail config
+// Save filter config for the current opened jail
 function saveJailConfig() {
   if (!currentJailForConfig) return;
   showLoading(true);
@@ -304,7 +561,8 @@ function saveJailConfig() {
       if (data.error) {
         alert("Error saving config: " + data.error);
       } else {
-        alert(data.message || "Config saved");
+        //alert(data.message || "Config saved");
+        console.log("Filter saved successfully. Reload needed? " + data.reloadNeeded);
         // Hide modal
         var modalEl = document.getElementById('jailConfigModal');
         var modalObj = bootstrap.Modal.getInstance(modalEl);
@@ -321,9 +579,208 @@ function saveJailConfig() {
     });
 }
 
+// Load current settings when opening settings page
+function loadSettings() {
+  showLoading(true);
+  fetch('/api/settings')
+    .then(res => res.json())
+    .then(data => {
+      // Get current general settings
+      document.getElementById('languageSelect').value = data.language || 'en';
+      document.getElementById('debugMode').checked = data.debug || false;
+
+      // Get current alert settings
+      document.getElementById('sourceEmail').value = data.sender || '';
+      document.getElementById('destEmail').value = data.destemail || '';
+      // alertCountries multi
+      const select = document.getElementById('alertCountries');
+      // clear selection
+      for (let i = 0; i < select.options.length; i++) {
+        select.options[i].selected = false;
+      }
+      if (!data.alertCountries || data.alertCountries.length === 0) {
+        // default to "ALL"
+        select.options[0].selected = true;
+      } else {
+        // Mark them selected
+        for (let i = 0; i < select.options.length; i++) {
+          let val = select.options[i].value;
+          if (data.alertCountries.includes(val)) {
+            select.options[i].selected = true;
+          }
+        }
+      }
+
+      // Get current Fail2Ban Configuration
+      document.getElementById('bantimeIncrement').checked = data.bantimeIncrement || false;
+      document.getElementById('banTime').value = data.bantime || '';
+      document.getElementById('findTime').value = data.findtime || '';
+      document.getElementById('maxRetry').value = data.maxretry || '';
+      document.getElementById('ignoreIP').value = data.ignoreip || '';
+    })
+    .catch(err => {
+      alert('Error loading settings: ' + err);
+    })
+    .finally(() => showLoading(false));
+}
+
+// Save settings when hit the save button
+function saveSettings(e) {
+  e.preventDefault(); // prevent form submission
+
+  showLoading(true);
+  const lang = document.getElementById('languageSelect').value;
+  const debugMode = document.getElementById("debugMode").checked;
+  const srcmail = document.getElementById('sourceEmail').value;
+  const destmail = document.getElementById('destEmail').value;
+
+  const select = document.getElementById('alertCountries');
+  let chosenCountries = [];
+  for (let i = 0; i < select.options.length; i++) {
+    if (select.options[i].selected) {
+      chosenCountries.push(select.options[i].value);
+    }
+  }
+  // If user selected "ALL", we override everything
+  if (chosenCountries.includes("ALL")) {
+    chosenCountries = ["all"];
+  }
+
+  const bantimeinc = document.getElementById('bantimeIncrement').checked;
+  const bant = document.getElementById('banTime').value;
+  const findt = document.getElementById('findTime').value;
+  const maxre = parseInt(document.getElementById('maxRetry').value, 10) || 1; // Default to 1 (if parsing fails)
+  const ignip = document.getElementById('ignoreIP').value;
+
+  const body = {
+    language: lang,
+    debug: debugMode,
+    sender: srcmail,
+    destemail: destmail,
+    alertCountries: chosenCountries,
+    bantimeIncrement: bantimeinc,
+    bantime: bant,
+    findtime: findt,
+    maxretry: maxre,
+    ignoreip: ignip
+  };
+
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error saving settings: ' + data.error + data.details);
+      } else {
+        //alert(data.message || 'Settings saved');
+        console.log("Settings saved successfully. Reload needed? " + data.reloadNeeded);
+        if (data.reloadNeeded) {
+          document.getElementById('reloadBanner').style.display = 'block';
+        }
+      }
+    })
+    .catch(err => alert('Error: ' + err))
+    .finally(() => showLoading(false));
+}
+
+// Load the list of filters from /api/filters
+function loadFilters() {
+  showLoading(true);
+  fetch('/api/filters')
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error loading filters: ' + data.error);
+        return;
+      }
+      const select = document.getElementById('filterSelect');
+      select.innerHTML = ''; // clear existing
+      if (!data.filters || data.filters.length === 0) {
+        // optional fallback
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No Filters Found';
+        select.appendChild(opt);
+      } else {
+        data.filters.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f;
+          opt.textContent = f;
+          select.appendChild(opt);
+        });
+      }
+    })
+    .catch(err => {
+      alert('Error loading filters: ' + err);
+    })
+    .finally(() => showLoading(false));
+}
+
+// Called when clicking "Test Filter" button
+function testSelectedFilter() {
+  const filterName = document.getElementById('filterSelect').value;
+  const lines = document.getElementById('logLinesTextarea').value.split('\n');
+  
+  if (!filterName) {
+    alert('Please select a filter.');
+    return;
+  }
+
+  showLoading(true);
+  fetch('/api/filters/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filterName: filterName,
+      logLines: lines
+    })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error: ' + data.error);
+        return;
+      }
+      // data.matches, for example
+      renderTestResults(data.matches);
+    })
+    .catch(err => {
+      alert('Error: ' + err);
+    })
+    .finally(() => showLoading(false));
+}
+
+function renderTestResults(matches) {
+  let html = '<h5>Test Results</h5>';
+  if (!matches || matches.length === 0) {
+    html += '<p>No matches found.</p>';
+  } else {
+    html += '<ul>';
+    matches.forEach(m => {
+      html += '<li>' + m + '</li>';
+    });
+    html += '</ul>';
+  }
+  document.getElementById('testResults').innerHTML = html;
+}
+
+// When showing the filter section
+function showFilterSection() {
+  loadFilters(); // fetch the filter list
+  document.getElementById('testResults').innerHTML = '';
+  document.getElementById('logLinesTextarea').value = '';
+}
+
+//*******************************************************************
+//*                     Reload fail2ban action :                    *
+//*******************************************************************
+
 // Reload Fail2ban
 function reloadFail2ban() {
-  if (!confirm("Reload Fail2ban now?")) return;
+  if (!confirm("It can happen that some logs are not parsed during the reload of fail2ban. Reload Fail2ban now?")) return;
   showLoading(true);
   fetch('/api/fail2ban/reload', { method: 'POST' })
     .then(function(res) { return res.json(); })
@@ -331,7 +788,6 @@ function reloadFail2ban() {
       if (data.error) {
         alert("Error: " + data.error);
       } else {
-        alert(data.message || "Fail2ban reloaded");
         // Hide reload banner
         document.getElementById('reloadBanner').style.display = 'none';
         // Refresh data
@@ -345,6 +801,7 @@ function reloadFail2ban() {
       showLoading(false);
     });
 }
+
 </script>
 </body>
 </html>
