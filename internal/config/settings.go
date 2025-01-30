@@ -291,12 +291,13 @@ norestored = 1
 
 actionban = /usr/bin/curl -X POST http://127.0.0.1:8080/api/ban \
      -H "Content-Type: application/json" \
-     -d "{\"ip\": \"<ip>\", \
-          \"jail\": \"<name>\", \
-          \"hostname\": \"<fq-hostname>\", \
-          \"failures\": \"<failures>\", \
-          \"whois\": \"%%(_whois_command)s\", \
-          \"logs\": \"%%(_grep_logs)s\"}"
+     -d "$(jq -n --arg ip '<ip>' \
+                 --arg jail '<name>' \
+                 --arg hostname '<fq-hostname>' \
+                 --arg failures '<failures>' \
+                 --arg whois "$(whois <ip> || echo 'missing whois program')" \
+                 --arg logs "$(grep <grepopts> -wF <ip> <logpath> | <greplimit>)" \
+                 '{ip: $ip, jail: $jail, hostname: $hostname, failures: $failures, whois: $whois, logs: $logs}')"
 
 [Init]
 

@@ -17,9 +17,11 @@
 package web
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -108,14 +110,27 @@ func BanNotificationHandler(c *gin.Context) {
 		Logs     string `json:"logs"`
 	}
 
+	// **DEBUGGING: Log Raw JSON Body**
+	body, _ := io.ReadAll(c.Request.Body)
+	log.Printf("📩 Incoming Ban Notification: %s\n", string(body))
+
+	// Rebind body so Gin can parse it again (important!)
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+
 	// Parse JSON request body
 	if err := c.ShouldBindJSON(&request); err != nil {
+		log.Printf("❌ Invalid request: %v\n", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
 		return
 	}
 
+	// **DEBUGGING: Log Parsed Request**
+	log.Printf("✅ Parsed Ban Request - IP: %s, Jail: %s, Hostname: %s, Failures: %s",
+		request.IP, request.Jail, request.Hostname, request.Failures)
+
 	// Handle the Fail2Ban notification
 	if err := HandleBanNotification(request.IP, request.Jail, request.Hostname, request.Failures, request.Whois, request.Logs); err != nil {
+		log.Printf("❌ Failed to process ban notification: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process ban notification: " + err.Error()})
 		return
 	}
@@ -498,43 +513,71 @@ func sendSMTPMessage(client *smtp.Client, from, to string, msg []byte) error {
 // *                      sendBanAlert Function :                    *
 // *******************************************************************
 func sendBanAlert(ip, jail, hostname, failures, whois, logs, country string, settings config.AppSettings) error {
-	subject := fmt.Sprintf("[Fail2Ban] %s: banned %s from %s", jail, ip, hostname)
+	subject := fmt.Sprintf("[Fail2Ban] %s: Banned %s from %s", jail, ip, hostname)
 
-	// Ensure HTML email format
+	// Improved Responsive HTML Email
 	body := fmt.Sprintf(`<!DOCTYPE html>
-	<html>
-	<head>
-	<meta charset="UTF-8">
-	<title>Fail2Ban Alert</title>
-	<style>
-		body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
-		.container { max-width: 600px; margin: 20px auto; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 2px 4px rgba(0,0,0,0.1); }
-		h2 { color: #d9534f; }
-		.details { background: #f9f9f9; padding: 15px; border-left: 4px solid #d9534f; margin-bottom: 10px; }
-		.footer { text-align: center; color: #888; font-size: 12px; padding-top: 10px; border-top: 1px solid #ddd; }
-		.label { font-weight: bold; color: #333; }
-		pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
-	</style>
-	</head>
-	<body>
-		<div class="container">
-			<h2>🚨 Fail2Ban Alert</h2>
-			<p>A new IP has been banned due to excessive failed login attempts.</p>
-			<div class="details">
-				<p><span class="label">📌 Banned IP:</span> %s</p>
-				<p><span class="label">🛡️ Jail Name:</span> %s</p>
-				<p><span class="label">🏠 Hostname:</span> %s</p>
-				<p><span class="label">🚫 Failed Attempts:</span> %s</p>
-				<p><span class="label">🌍 Country:</span> %s</p>
-			</div>
-			<h3>🔍 Whois Information:</h3>
-			<pre>%s</pre>
-			<h3>📄 Log Entries:</h3>
-			<pre>%s</pre>
-			<p class="footer">This email was generated automatically by Fail2Ban. If you believe this was a mistake, please review your security settings.</p>
-		</div>
-	</body>
-	</html>`, ip, jail, hostname, failures, country, whois, logs)
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fail2Ban Alert</title>
+<style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 20px auto; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 2px 4px rgba(0,0,0,0.1); }
+    .header { text-align: center; padding-bottom: 10px; border-bottom: 2px solid #d9534f; }
+    .header img { max-width: 150px; }
+    .header h2 { color: #d9534f; margin: 10px 0; font-size: 24px; }
+    .content { padding: 15px; }
+    .details { background: #f9f9f9; padding: 15px; border-left: 4px solid #d9534f; margin-bottom: 10px; }
+    .footer { text-align: center; color: #888; font-size: 12px; padding-top: 10px; border-top: 1px solid #ddd; margin-top: 15px; }
+    .label { font-weight: bold; color: #333; }
+    pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    /* Mobile Styles */
+    @media screen and (max-width: 600px) {
+        .container { width: 90%%; padding: 10px; }
+        .header h2 { font-size: 20px; }
+        .details p { font-size: 14px; }
+        .footer { font-size: 10px; }
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <img src="https://swissmakers.ch/wp-content/uploads/2023/09/cyber.png" alt="Swissmakers GmbH" width="150" />
+            <h2>🚨 Security Alert from Fail2Ban</h2>
+        </div>
+
+        <!-- ALERT MESSAGE -->
+        <div class="content">
+            <p>A new IP has been banned due to excessive failed login attempts.</p>
+
+            <div class="details">
+                <p><span class="label">📌 Banned IP:</span> %s</p>
+                <p><span class="label">🛡️ Jail Name:</span> %s</p>
+                <p><span class="label">🏠 Hostname:</span> %s</p>
+                <p><span class="label">🚫 Failed Attempts:</span> %s</p>
+                <p><span class="label">🌍 Country:</span> %s</p>
+            </div>
+
+            <h3>🔍 Whois Information:</h3>
+            <pre>%s</pre>
+
+            <h3>📄 Log Entries:</h3>
+            <pre>%s</pre>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <p>This email was generated automatically by Fail2Ban.</p>
+            <p>For security inquiries, contact <a href="mailto:support@swissmakers.ch">support@swissmakers.ch</a></p>
+            <p>&copy; %d Swissmakers GmbH. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`, ip, jail, hostname, failures, country, whois, logs, time.Now().Year())
 
 	// Send the email
 	return sendEmail(settings.Destemail, subject, body, settings)
