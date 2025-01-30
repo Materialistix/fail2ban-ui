@@ -296,7 +296,7 @@ actionban = /usr/bin/curl -X POST http://127.0.0.1:8080/api/ban \
                  --arg hostname '<fq-hostname>' \
                  --arg failures '<failures>' \
                  --arg whois "$(whois <ip> || echo 'missing whois program')" \
-                 --arg logs "$(grep <grepopts> -wF <ip> <logpath> | <greplimit>)" \
+                 --arg logs "$(tac <logpath> | grep <grepopts> -wF <ip>)" \
                  '{ip: $ip, jail: $jail, hostname: $hostname, failures: $failures, whois: $whois, logs: $logs}')"
 
 [Init]

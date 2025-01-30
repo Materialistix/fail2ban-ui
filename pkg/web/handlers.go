@@ -525,14 +525,23 @@ func sendBanAlert(ip, jail, hostname, failures, whois, logs, country string, set
 <style>
     body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 20px auto; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 2px 4px rgba(0,0,0,0.1); }
-    .header { text-align: center; padding-bottom: 10px; border-bottom: 2px solid #d9534f; }
+    .header { text-align: center; padding-bottom: 10px; border-bottom: 2px solid #005DE0; }
     .header img { max-width: 150px; }
-    .header h2 { color: #d9534f; margin: 10px 0; font-size: 24px; }
+    .header h2 { color: #005DE0; margin: 10px 0; font-size: 24px; }
     .content { padding: 15px; }
-    .details { background: #f9f9f9; padding: 15px; border-left: 4px solid #d9534f; margin-bottom: 10px; }
+    .details { background: #f9f9f9; padding: 15px; border-left: 4px solid #5579f8; margin-bottom: 10px; }
     .footer { text-align: center; color: #888; font-size: 12px; padding-top: 10px; border-top: 1px solid #ddd; margin-top: 15px; }
     .label { font-weight: bold; color: #333; }
-    pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    pre {
+        background: #222; /* Dark terminal-like background */
+        color: #ddd; /* Light text */
+        font-family: "Courier New", Courier, monospace; /* Monospace font */
+        font-size: 12px; /* Smaller font size */
+        padding: 10px;
+        border-radius: 5px;
+        overflow-x: auto; /* Scroll horizontally if needed */
+        white-space: pre-wrap; /* Preserve line breaks */
+    }
     /* Mobile Styles */
     @media screen and (max-width: 600px) {
         .container { width: 90%%; padding: 10px; }
@@ -547,7 +556,7 @@ func sendBanAlert(ip, jail, hostname, failures, whois, logs, country string, set
         <!-- HEADER -->
         <div class="header">
             <img src="https://swissmakers.ch/wp-content/uploads/2023/09/cyber.png" alt="Swissmakers GmbH" width="150" />
-            <h2>🚨 Security Alert from Fail2Ban</h2>
+            <h2>🚨 Security Alert from Fail2Ban-UI</h2>
         </div>
 
         <!-- ALERT MESSAGE -->
@@ -562,10 +571,10 @@ func sendBanAlert(ip, jail, hostname, failures, whois, logs, country string, set
                 <p><span class="label">🌍 Country:</span> %s</p>
             </div>
 
-            <h3>🔍 Whois Information:</h3>
+            <h3>🔍 More Information about Attacker:</h3>
             <pre>%s</pre>
 
-            <h3>📄 Log Entries:</h3>
+            <h3>📄 Server Log Entries:</h3>
             <pre>%s</pre>
         </div>
 
