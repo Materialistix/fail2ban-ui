@@ -17,13 +17,14 @@
 package web
 
 import (
-	"bytes"
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"net/smtp"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -195,40 +196,6 @@ func shouldAlertForCountry(country string, alertCountries []string) bool {
 	return false
 }
 
-// sendBanAlert sends an email notification for a banned IP.
-func sendBanAlert(ip, jail, hostname, failures, whois, logs, country string, settings config.AppSettings) error {
-	// Construct email content
-	emailBody := fmt.Sprintf(`Subject: [Fail2Ban] %s: banned %s from %s
-Date: `+"`LC_ALL=C date +\"%%a, %%d %%h %%Y %%T %%z\"`"+`
-From: %s <%s>
-To: %s
-
-Hi,
-
-The IP %s has just been banned by Fail2Ban after %s attempts against %s.
-
-📍 Country: %s
-🔍 Whois Info: 
-%s
-
-📄 Log Entries:
-%s
-
-Best Regards,
-Fail2Ban
-`, jail, ip, hostname, settings.Sender, settings.Sender, settings.Destemail, ip, failures, jail, country, whois, logs)
-
-	// Use msmtp or sendmail to send email
-	cmd := exec.Command("/usr/sbin/sendmail", "-f", settings.Sender, settings.Destemail)
-	cmd.Stdin = bytes.NewBufferString(emailBody)
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	return nil
-}
-
 func sortByTimeDesc(events []fail2ban.BanEvent) {
 	for i := 0; i < len(events); i++ {
 		for j := i + 1; j < len(events); j++ {
@@ -395,7 +362,7 @@ func ApplyFail2banSettings(jailLocalPath string) error {
 		fmt.Sprintf("findtime = %s", s.Findtime),
 		fmt.Sprintf("maxretry = %d", s.Maxretry),
 		fmt.Sprintf("destemail = %s", s.Destemail),
-		fmt.Sprintf("sender = %s", s.Sender),
+		//fmt.Sprintf("sender = %s", s.Sender),
 		"",
 	}
 	content := strings.Join(newLines, "\n")
@@ -426,4 +393,201 @@ func ReloadFail2banHandler(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Fail2ban reloaded successfully"})
+}
+
+// *******************************************************************
+// *                 Unified Email Sending Function :                *
+// *******************************************************************
+func sendEmail(to, subject, body string, settings config.AppSettings) error {
+	// Validate SMTP settings
+	if settings.SMTP.Host == "" || settings.SMTP.Username == "" || settings.SMTP.Password == "" || settings.SMTP.From == "" {
+		return errors.New("SMTP settings are incomplete. Please configure all required fields")
+	}
+
+	// Format message with **correct HTML headers**
+	message := fmt.Sprintf("From: %s\nTo: %s\nSubject: %s\n"+
+		"MIME-Version: 1.0\nContent-Type: text/html; charset=\"UTF-8\"\n\n%s",
+		settings.SMTP.From, to, subject, body)
+	msg := []byte(message)
+
+	// SMTP Connection Config
+	smtpHost := settings.SMTP.Host
+	smtpPort := settings.SMTP.Port
+	auth := LoginAuth(settings.SMTP.Username, settings.SMTP.Password)
+	smtpAddr := fmt.Sprintf("%s:%d", smtpHost, smtpPort)
+
+	// **Choose Connection Type**
+	if smtpPort == 465 {
+		// SMTPS (Implicit TLS) - Not supported at the moment.
+		tlsConfig := &tls.Config{ServerName: smtpHost}
+		conn, err := tls.Dial("tcp", smtpAddr, tlsConfig)
+		if err != nil {
+			return fmt.Errorf("failed to connect via TLS: %w", err)
+		}
+		defer conn.Close()
+
+		client, err := smtp.NewClient(conn, smtpHost)
+		if err != nil {
+			return fmt.Errorf("failed to create SMTP client: %w", err)
+		}
+		defer client.Quit()
+
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("SMTP authentication failed: %w", err)
+		}
+
+		return sendSMTPMessage(client, settings.SMTP.From, to, msg)
+
+	} else if smtpPort == 587 {
+		// STARTTLS (Explicit TLS)
+		conn, err := net.Dial("tcp", smtpAddr)
+		if err != nil {
+			return fmt.Errorf("failed to connect to SMTP server: %w", err)
+		}
+		defer conn.Close()
+
+		client, err := smtp.NewClient(conn, smtpHost)
+		if err != nil {
+			return fmt.Errorf("failed to create SMTP client: %w", err)
+		}
+		defer client.Quit()
+
+		// Start TLS Upgrade
+		tlsConfig := &tls.Config{ServerName: smtpHost}
+		if err := client.StartTLS(tlsConfig); err != nil {
+			return fmt.Errorf("failed to start TLS: %w", err)
+		}
+
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("SMTP authentication failed: %w", err)
+		}
+
+		return sendSMTPMessage(client, settings.SMTP.From, to, msg)
+	}
+
+	return errors.New("unsupported SMTP port. Use 587 (STARTTLS) or 465 (SMTPS)")
+}
+
+// Helper Function to Send SMTP Message
+func sendSMTPMessage(client *smtp.Client, from, to string, msg []byte) error {
+	// Set sender & recipient
+	if err := client.Mail(from); err != nil {
+		return fmt.Errorf("failed to set sender: %w", err)
+	}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("failed to set recipient: %w", err)
+	}
+
+	// Send email body
+	wc, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("failed to start data command: %w", err)
+	}
+	defer wc.Close()
+
+	if _, err = wc.Write(msg); err != nil {
+		return fmt.Errorf("failed to write email content: %w", err)
+	}
+
+	// Close connection
+	client.Quit()
+	return nil
+}
+
+// *******************************************************************
+// *                      sendBanAlert Function :                    *
+// *******************************************************************
+func sendBanAlert(ip, jail, hostname, failures, whois, logs, country string, settings config.AppSettings) error {
+	subject := fmt.Sprintf("[Fail2Ban] %s: banned %s from %s", jail, ip, hostname)
+
+	// Ensure HTML email format
+	body := fmt.Sprintf(`<!DOCTYPE html>
+	<html>
+	<head>
+	<meta charset="UTF-8">
+	<title>Fail2Ban Alert</title>
+	<style>
+		body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+		.container { max-width: 600px; margin: 20px auto; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 2px 4px rgba(0,0,0,0.1); }
+		h2 { color: #d9534f; }
+		.details { background: #f9f9f9; padding: 15px; border-left: 4px solid #d9534f; margin-bottom: 10px; }
+		.footer { text-align: center; color: #888; font-size: 12px; padding-top: 10px; border-top: 1px solid #ddd; }
+		.label { font-weight: bold; color: #333; }
+		pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
+	</style>
+	</head>
+	<body>
+		<div class="container">
+			<h2>🚨 Fail2Ban Alert</h2>
+			<p>A new IP has been banned due to excessive failed login attempts.</p>
+			<div class="details">
+				<p><span class="label">📌 Banned IP:</span> %s</p>
+				<p><span class="label">🛡️ Jail Name:</span> %s</p>
+				<p><span class="label">🏠 Hostname:</span> %s</p>
+				<p><span class="label">🚫 Failed Attempts:</span> %s</p>
+				<p><span class="label">🌍 Country:</span> %s</p>
+			</div>
+			<h3>🔍 Whois Information:</h3>
+			<pre>%s</pre>
+			<h3>📄 Log Entries:</h3>
+			<pre>%s</pre>
+			<p class="footer">This email was generated automatically by Fail2Ban. If you believe this was a mistake, please review your security settings.</p>
+		</div>
+	</body>
+	</html>`, ip, jail, hostname, failures, country, whois, logs)
+
+	// Send the email
+	return sendEmail(settings.Destemail, subject, body, settings)
+}
+
+// *******************************************************************
+// *               TestEmailHandler to send test-mail :              *
+// *******************************************************************
+func TestEmailHandler(c *gin.Context) {
+	settings := config.GetSettings()
+
+	err := sendEmail(
+		settings.Destemail,
+		"Test Email from Fail2Ban UI",
+		"This is a test email sent from the Fail2Ban UI to verify SMTP settings.",
+		settings,
+	)
+
+	if err != nil {
+		log.Printf("❌ Test email failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send test email: " + err.Error()})
+		return
+	}
+
+	log.Println("✅ Test email sent successfully!")
+	c.JSON(http.StatusOK, gin.H{"message": "Test email sent successfully!"})
+}
+
+// *******************************************************************
+// *                 Office365 LOGIN Authentication :                *
+// *******************************************************************
+type loginAuth struct {
+	username, password string
+}
+
+func LoginAuth(username, password string) smtp.Auth {
+	return &loginAuth{username, password}
+}
+
+func (a *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	return "LOGIN", []byte(a.username), nil
+}
+
+func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if more {
+		switch string(fromServer) {
+		case "Username:":
+			return []byte(a.username), nil
+		case "Password:":
+			return []byte(a.password), nil
+		default:
+			return nil, errors.New("unexpected server challenge")
+		}
+	}
+	return nil, nil
 }

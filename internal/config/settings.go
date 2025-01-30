@@ -28,22 +28,32 @@ import (
 	"sync"
 )
 
-// AppSettings holds both the UI settings (like language) and
-// relevant Fail2ban jail/local config options.
-type AppSettings struct {
-	Language       string   `json:"language"`
-	Debug          bool     `json:"debug"`
-	ReloadNeeded   bool     `json:"reloadNeeded"`
-	AlertCountries []string `json:"alertCountries"`
+// SMTPSettings holds the SMTP server configuration for sending alert emails
+type SMTPSettings struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	From     string `json:"from"`
+	UseTLS   bool   `json:"useTLS"`
+}
 
-	// These mirror some Fail2ban [DEFAULT] section parameters from jail.local
+// AppSettings holds the main UI settings and Fail2ban configuration
+type AppSettings struct {
+	Language       string       `json:"language"`
+	Debug          bool         `json:"debug"`
+	ReloadNeeded   bool         `json:"reloadNeeded"`
+	AlertCountries []string     `json:"alertCountries"`
+	SMTP           SMTPSettings `json:"smtp"`
+
+	// Fail2Ban [DEFAULT] section values from jail.local
 	BantimeIncrement bool   `json:"bantimeIncrement"`
 	IgnoreIP         string `json:"ignoreip"`
 	Bantime          string `json:"bantime"`
 	Findtime         string `json:"findtime"`
 	Maxretry         int    `json:"maxretry"`
 	Destemail        string `json:"destemail"`
-	Sender           string `json:"sender"`
+	//Sender           string `json:"sender"`
 }
 
 // init paths to key-files
@@ -88,7 +98,7 @@ func setDefaults() {
 		currentSettings.Language = "en"
 	}
 	if currentSettings.AlertCountries == nil {
-		currentSettings.AlertCountries = []string{"all"}
+		currentSettings.AlertCountries = []string{"ALL"}
 	}
 	if currentSettings.Bantime == "" {
 		currentSettings.Bantime = "48h"
@@ -100,10 +110,25 @@ func setDefaults() {
 		currentSettings.Maxretry = 3
 	}
 	if currentSettings.Destemail == "" {
-		currentSettings.Destemail = "alerts@swissmakers.ch"
+		currentSettings.Destemail = "alerts@example.com"
 	}
-	if currentSettings.Sender == "" {
-		currentSettings.Sender = "noreply@swissmakers.ch"
+	if currentSettings.SMTP.Host == "" {
+		currentSettings.SMTP.Host = "smtp.office365.com"
+	}
+	if currentSettings.SMTP.Port == 0 {
+		currentSettings.SMTP.Port = 587
+	}
+	if currentSettings.SMTP.Username == "" {
+		currentSettings.SMTP.Username = "noreply@swissmakers.ch"
+	}
+	if currentSettings.SMTP.Password == "" {
+		currentSettings.SMTP.Password = "password"
+	}
+	if currentSettings.SMTP.From == "" {
+		currentSettings.SMTP.From = "noreply@swissmakers.ch"
+	}
+	if !currentSettings.SMTP.UseTLS {
+		currentSettings.SMTP.UseTLS = true
 	}
 	if currentSettings.IgnoreIP == "" {
 		currentSettings.IgnoreIP = "127.0.0.1/8 ::1"
@@ -151,9 +176,9 @@ func initializeFromJailFile() error {
 	if val, ok := settings["destemail"]; ok {
 		currentSettings.Destemail = val
 	}
-	if val, ok := settings["sender"]; ok {
+	/*if val, ok := settings["sender"]; ok {
 		currentSettings.Sender = val
-	}
+	}*/
 
 	return nil
 }
@@ -379,9 +404,10 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 		old.IgnoreIP != new.IgnoreIP ||
 		old.Bantime != new.Bantime ||
 		old.Findtime != new.Findtime ||
-		old.Maxretry != new.Maxretry ||
+		//old.Maxretry != new.Maxretry ||
 		old.Destemail != new.Destemail ||
-		old.Sender != new.Sender {
+		//old.Sender != new.Sender {
+		old.Maxretry != new.Maxretry {
 		new.ReloadNeeded = true
 	} else {
 		// preserve previous ReloadNeeded if it was already true

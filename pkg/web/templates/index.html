@@ -143,21 +143,13 @@
     <!-- Alert Settings Group -->
     <fieldset class="border p-3 rounded mb-4">
       <legend class="w-auto px-2">Alert Settings</legend>
-
-      <!-- Source Email -->
       <div class="mb-3">
-        <label for="sourceEmail" class="form-label">Source Email - Emails are sent from this address.</label>
-        <input type="email" class="form-control" id="sourceEmail"/>
+        <label for="destEmail" class="form-label">Destination Email (Alerts Receiver)</label>
+        <input type="email" class="form-control" id="destEmail" placeholder="alerts@swissmakers.ch" />
       </div>
-      <!-- Destination Email -->
       <div class="mb-3">
-        <label for="destEmail" class="form-label">Destination Email - Where to sent the alert messages?</label>
-        <input type="email" class="form-control" id="destEmail" placeholder="e.g., alerts@swissmakers.ch" />
-      </div>
-      <!-- Alert Countries -->
-      <div class="mb-3">
-        <label for="alertCountries" class="form-label">Select alert Countries</label>
-        <p class="text-muted">Choose which country IP blocks should trigger an email. You can select multiple with CTRL.</p>
+        <label for="alertCountries" class="form-label">Select Alert Countries</label>
+        <p class="text-muted">Choose which country IP blocks should trigger an email (hold CTRL for multiple).</p>
         <select id="alertCountries" class="form-select" multiple size="7">
           <option value="ALL">ALL (Every Country)</option>
           <option value="CH">Switzerland (CH)</option>
@@ -169,6 +161,37 @@
           <!-- Maybe i will add more later.. -->
         </select>
       </div>
+    </fieldset>
+
+    <!-- SMTP Configuration Group -->
+    <fieldset class="border p-3 rounded mb-4">
+      <legend class="w-auto px-2">SMTP Configuration</legend>
+      <div class="mb-3">
+        <label for="smtpHost" class="form-label">SMTP Host</label>
+        <input type="text" class="form-control" id="smtpHost" placeholder="e.g., smtp.gmail.com" required />
+      </div>
+      <label for="smtpPort">SMTP Port</label>
+      <select id="smtpPort" class="form-select">
+          <option value="587" selected>587 (Recommended - STARTTLS)</option>
+          <option value="465" disabled>465 (Not Supported)</option>
+      </select>
+      <div class="mb-3">
+        <label for="smtpUsername" class="form-label">SMTP Username</label>
+        <input type="text" class="form-control" id="smtpUsername" placeholder="e.g., user@example.com" required />
+      </div>
+      <div class="mb-3">
+        <label for="smtpPassword" class="form-label">SMTP Password</label>
+        <input type="password" class="form-control" id="smtpPassword" placeholder="Enter SMTP Password" required />
+      </div>
+      <div class="mb-3">
+        <label for="smtpFrom" class="form-label">Sender Email</label>
+        <input type="email" class="form-control" id="smtpFrom" placeholder="noreply@swissmakers.ch" required />
+      </div>
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="smtpUseTLS">
+        <label for="smtpUseTLS" class="form-check-label">Use TLS (Recommended)</label>
+      </div>
+      <button type="button" class="btn btn-secondary mt-2" onclick="sendTestEmail()">Send Test Email</button>
     </fieldset>
 
     <!-- Fail2Ban Configuration Group -->
@@ -198,9 +221,9 @@
       <!-- Ignore IPs -->
       <div class="mb-3">
         <label for="ignoreIP" class="form-label">Ignore IPs</label>
-        <textarea class="form-control" id="ignoreIP" rows="2" placeholder="Enter IPs to ignore, separated by spaces"></textarea>
+        <textarea class="form-control" id="ignoreIP" rows="2" placeholder="IPs to ignore, separated by spaces"></textarea>
       </div>
-    </fieldset>  
+    </fieldset>
     <button type="submit" class="btn btn-primary">Save</button>
   </form>
 </div>
@@ -589,12 +612,11 @@ function loadSettings() {
       document.getElementById('languageSelect').value = data.language || 'en';
       document.getElementById('debugMode').checked = data.debug || false;
 
-      // Get current alert settings
-      document.getElementById('sourceEmail').value = data.sender || '';
+      // Get Alert settings
       document.getElementById('destEmail').value = data.destemail || '';
-      // alertCountries multi
+
+      // Get Alert countries selection
       const select = document.getElementById('alertCountries');
-      // clear selection
       for (let i = 0; i < select.options.length; i++) {
         select.options[i].selected = false;
       }
@@ -611,7 +633,17 @@ function loadSettings() {
         }
       }
 
-      // Get current Fail2Ban Configuration
+      // Get SMTP settings
+      if (data.smtp) {
+        document.getElementById('smtpHost').value = data.smtp.host || '';
+        document.getElementById('smtpPort').value = data.smtp.port || 587;
+        document.getElementById('smtpUsername').value = data.smtp.username || '';
+        document.getElementById('smtpPassword').value = data.smtp.password || '';
+        document.getElementById('smtpFrom').value = data.smtp.from || '';
+        document.getElementById('smtpUseTLS').checked = data.smtp.useTLS || false;
+      }
+
+      // Get current Fail2Ban settings
       document.getElementById('bantimeIncrement').checked = data.bantimeIncrement || false;
       document.getElementById('banTime').value = data.bantime || '';
       document.getElementById('findTime').value = data.findtime || '';
@@ -625,57 +657,49 @@ function loadSettings() {
 }
 
 // Save settings when hit the save button
-function saveSettings(e) {
-  e.preventDefault(); // prevent form submission
+function saveSettings(event) {
+  event.preventDefault(); // prevent form submission
 
   showLoading(true);
-  const lang = document.getElementById('languageSelect').value;
-  const debugMode = document.getElementById("debugMode").checked;
-  const srcmail = document.getElementById('sourceEmail').value;
-  const destmail = document.getElementById('destEmail').value;
+  
+  // Gather form values
+  const smtpSettings = {
+    host: document.getElementById('smtpHost').value.trim(),
+    port: parseInt(document.getElementById('smtpPort').value, 10) || 587,
+    username: document.getElementById('smtpUsername').value.trim(),
+    password: document.getElementById('smtpPassword').value.trim(),
+    from: document.getElementById('smtpFrom').value.trim(),
+    useTLS: document.getElementById('smtpUseTLS').checked,
+  };
 
-  const select = document.getElementById('alertCountries');
-  let chosenCountries = [];
-  for (let i = 0; i < select.options.length; i++) {
-    if (select.options[i].selected) {
-      chosenCountries.push(select.options[i].value);
-    }
-  }
-  // If user selected "ALL", we override everything
-  if (chosenCountries.includes("ALL")) {
-    chosenCountries = ["all"];
-  }
+  const selectedCountries = Array.from(document.getElementById('alertCountries').selectedOptions).map(opt => opt.value);
 
-  const bantimeinc = document.getElementById('bantimeIncrement').checked;
-  const bant = document.getElementById('banTime').value;
-  const findt = document.getElementById('findTime').value;
-  const maxre = parseInt(document.getElementById('maxRetry').value, 10) || 1; // Default to 1 (if parsing fails)
-  const ignip = document.getElementById('ignoreIP').value;
+  const settingsData = {
+    language: document.getElementById('languageSelect').value,
+    debug: document.getElementById('debugMode').checked,
+    destemail: document.getElementById('destEmail').value.trim(),
+    alertCountries: selectedCountries.length > 0 ? selectedCountries : ["ALL"],
+    
+    bantimeIncrement: document.getElementById('bantimeIncrement').checked,
+    bantime: document.getElementById('banTime').value.trim(),
+    findtime: document.getElementById('findTime').value.trim(),
+    
+    maxretry: parseInt(document.getElementById('maxRetry').value, 10) || 3,
+    ignoreip: document.getElementById('ignoreIP').value.trim(),
 
-  const body = {
-    language: lang,
-    debug: debugMode,
-    sender: srcmail,
-    destemail: destmail,
-    alertCountries: chosenCountries,
-    bantimeIncrement: bantimeinc,
-    bantime: bant,
-    findtime: findt,
-    maxretry: maxre,
-    ignoreip: ignip
+    smtp: smtpSettings // (Includes SMTP settings)
   };
 
   fetch('/api/settings', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
+    body: JSON.stringify(settingsData),
   })
     .then(res => res.json())
     .then(data => {
       if (data.error) {
         alert('Error saving settings: ' + data.error + data.details);
       } else {
-        //alert(data.message || 'Settings saved');
         console.log("Settings saved successfully. Reload needed? " + data.reloadNeeded);
         if (data.reloadNeeded) {
           document.getElementById('reloadBanner').style.display = 'block';
@@ -716,6 +740,25 @@ function loadFilters() {
     .catch(err => {
       alert('Error loading filters: ' + err);
     })
+    .finally(() => showLoading(false));
+}
+
+function sendTestEmail() {
+  showLoading(true);
+
+  fetch('/api/settings/test-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error sending test email: ' + data.error);
+      } else {
+        alert('Test email sent successfully!');
+      }
+    })
+    .catch(error => alert('Error: ' + error))
     .finally(() => showLoading(false));
 }
 

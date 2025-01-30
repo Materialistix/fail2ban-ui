@@ -37,6 +37,7 @@ func RegisterRoutes(r *gin.Engine) {
 		// settings
 		api.GET("/settings", GetSettingsHandler)
 		api.POST("/settings", UpdateSettingsHandler)
+		api.POST("/settings/test-email", TestEmailHandler)
 
 		// filter debugger
 		api.GET("/filters", ListFiltersHandler)
