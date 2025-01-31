@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -28,22 +27,32 @@ import (
 	"sync"
 )
 
-// AppSettings holds both the UI settings (like language) and
-// relevant Fail2ban jail/local config options.
-type AppSettings struct {
-	Language       string   `json:"language"`
-	Debug          bool     `json:"debug"`
-	ReloadNeeded   bool     `json:"reloadNeeded"`
-	AlertCountries []string `json:"alertCountries"`
+// SMTPSettings holds the SMTP server configuration for sending alert emails
+type SMTPSettings struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	From     string `json:"from"`
+	UseTLS   bool   `json:"useTLS"`
+}
 
-	// These mirror some Fail2ban [DEFAULT] section parameters from jail.local
+// AppSettings holds the main UI settings and Fail2ban configuration
+type AppSettings struct {
+	Language       string       `json:"language"`
+	Debug          bool         `json:"debug"`
+	ReloadNeeded   bool         `json:"reloadNeeded"`
+	AlertCountries []string     `json:"alertCountries"`
+	SMTP           SMTPSettings `json:"smtp"`
+
+	// Fail2Ban [DEFAULT] section values from jail.local
 	BantimeIncrement bool   `json:"bantimeIncrement"`
 	IgnoreIP         string `json:"ignoreip"`
 	Bantime          string `json:"bantime"`
 	Findtime         string `json:"findtime"`
 	Maxretry         int    `json:"maxretry"`
 	Destemail        string `json:"destemail"`
-	Sender           string `json:"sender"`
+	//Sender           string `json:"sender"`
 }
 
 // init paths to key-files
@@ -63,11 +72,12 @@ var (
 func init() {
 	// Attempt to load existing file; if it doesn't exist, create with defaults.
 	if err := loadSettings(); err != nil {
-		fmt.Println("App settings not found, initializing new from jail.local (if exist):", err)
+		fmt.Println("App settings not found, initializing from jail.local (if exist)")
 		if err := initializeFromJailFile(); err != nil {
 			fmt.Println("Error reading jail.local:", err)
 		}
 		setDefaults()
+		fmt.Println("Initialized successfully.")
 
 		// save defaults to file
 		if err := saveSettings(); err != nil {
@@ -88,7 +98,7 @@ func setDefaults() {
 		currentSettings.Language = "en"
 	}
 	if currentSettings.AlertCountries == nil {
-		currentSettings.AlertCountries = []string{"all"}
+		currentSettings.AlertCountries = []string{"ALL"}
 	}
 	if currentSettings.Bantime == "" {
 		currentSettings.Bantime = "48h"
@@ -100,10 +110,25 @@ func setDefaults() {
 		currentSettings.Maxretry = 3
 	}
 	if currentSettings.Destemail == "" {
-		currentSettings.Destemail = "alerts@swissmakers.ch"
+		currentSettings.Destemail = "alerts@example.com"
 	}
-	if currentSettings.Sender == "" {
-		currentSettings.Sender = "noreply@swissmakers.ch"
+	if currentSettings.SMTP.Host == "" {
+		currentSettings.SMTP.Host = "smtp.office365.com"
+	}
+	if currentSettings.SMTP.Port == 0 {
+		currentSettings.SMTP.Port = 587
+	}
+	if currentSettings.SMTP.Username == "" {
+		currentSettings.SMTP.Username = "noreply@swissmakers.ch"
+	}
+	if currentSettings.SMTP.Password == "" {
+		currentSettings.SMTP.Password = "password"
+	}
+	if currentSettings.SMTP.From == "" {
+		currentSettings.SMTP.From = "noreply@swissmakers.ch"
+	}
+	if !currentSettings.SMTP.UseTLS {
+		currentSettings.SMTP.UseTLS = true
 	}
 	if currentSettings.IgnoreIP == "" {
 		currentSettings.IgnoreIP = "127.0.0.1/8 ::1"
@@ -151,9 +176,9 @@ func initializeFromJailFile() error {
 	if val, ok := settings["destemail"]; ok {
 		currentSettings.Destemail = val
 	}
-	if val, ok := settings["sender"]; ok {
+	/*if val, ok := settings["sender"]; ok {
 		currentSettings.Sender = val
-	}
+	}*/
 
 	return nil
 }
@@ -169,7 +194,7 @@ func initializeFail2banAction() error {
 		fmt.Println("Error setting up jail.d configuration:", err)
 	}
 	// Write the fail2ban action file
-	return writeFail2banAction(currentSettings.AlertCountries)
+	return writeFail2banAction()
 }
 
 // setupGeoCustomAction checks and replaces the default action in jail.local with our from fail2ban-UI
@@ -226,7 +251,7 @@ func ensureJailDConfig() error {
 	// Check if the file already exists
 	if _, err := os.Stat(jailDFile); err == nil {
 		// File already exists, do nothing
-		fmt.Println("Custom jail.d configuration already exists.")
+		DebugLog("Custom jail.d configuration already exists.")
 		return nil
 	}
 
@@ -243,18 +268,14 @@ action_mwlg = %(action_)s
 		return fmt.Errorf("failed to write jail.d config: %v", err)
 	}
 
-	fmt.Println("Created custom jail.d configuration at:", jailDFile)
+	DebugLog("Created custom jail.d configuration at: %v", jailDFile)
 	return nil
 }
 
 // writeFail2banAction creates or updates the action file with the AlertCountries.
-func writeFail2banAction(alertCountries []string) error {
-
-	// Join the alertCountries into a comma-separated string
-	countriesFormatted := strings.Join(alertCountries, ",")
-
+func writeFail2banAction() error {
 	// Define the Fail2Ban action file content
-	actionConfig := fmt.Sprintf(`[INCLUDES]
+	actionConfig := `[INCLUDES]
 
 before = sendmail-common.conf
          mail-whois-common.conf
@@ -266,9 +287,17 @@ before = sendmail-common.conf
 norestored = 1
 
 # Option: actionban
-# This executes the Python script with <ip> and the list of allowed countries.
-# If the country matches the allowed list, it sends the email.
-actionban = /etc/fail2ban/action.d/geoip_notify.py <ip> "%s" 'name=<name>;ip=<ip>;fq-hostname=<fq-hostname>;sendername=<sendername>;sender=<sender>;dest=<dest>;failures=<failures>;_whois_command=%%(_whois_command)s;_grep_logs=%%(_grep_logs)s;grepmax=<grepmax>;mailcmd=<mailcmd>'
+# This executes a cURL request to notify our API when an IP is banned.
+
+actionban = /usr/bin/curl -X POST http://127.0.0.1:8080/api/ban \
+     -H "Content-Type: application/json" \
+     -d "$(jq -n --arg ip '<ip>' \
+                 --arg jail '<name>' \
+                 --arg hostname '<fq-hostname>' \
+                 --arg failures '<failures>' \
+                 --arg whois "$(whois <ip> || echo 'missing whois program')" \
+                 --arg logs "$(tac <logpath> | grep <grepopts> -wF <ip>)" \
+                 '{ip: $ip, jail: $jail, hostname: $hostname, failures: $failures, whois: $whois, logs: $logs}')"
 
 [Init]
 
@@ -280,8 +309,7 @@ logpath = /dev/null
 
 # Number of log lines to include in the email
 # grepmax = 1000
-# grepopts = -m <grepmax>
-`, countriesFormatted)
+# grepopts = -m <grepmax>`
 
 	// Write the action file
 	err := os.WriteFile(actionFile, []byte(actionConfig), 0644)
@@ -289,14 +317,14 @@ logpath = /dev/null
 		return fmt.Errorf("failed to write action file: %w", err)
 	}
 
-	fmt.Printf("Action file successfully written to %s\n", actionFile)
+	DebugLog("Custom-action file successfully written to %s\n", actionFile)
 	return nil
 }
 
 // loadSettings reads fail2ban-ui-settings.json into currentSettings.
 func loadSettings() error {
-	fmt.Println("----------------------------")
-	fmt.Println("loadSettings called (settings.go)") // entry point
+	DebugLog("----------------------------")
+	DebugLog("loadSettings called (settings.go)") // entry point
 	data, err := os.ReadFile(settingsFile)
 	if os.IsNotExist(err) {
 		return err // triggers setDefaults + save
@@ -318,24 +346,21 @@ func loadSettings() error {
 
 // saveSettings writes currentSettings to JSON
 func saveSettings() error {
-	fmt.Println("----------------------------")
-	fmt.Println("saveSettings called (settings.go)") // entry point
+	DebugLog("----------------------------")
+	DebugLog("saveSettings called (settings.go)") // entry point
 
 	b, err := json.MarshalIndent(currentSettings, "", "  ")
 	if err != nil {
-		fmt.Println("Error marshalling settings:", err) // Debug
+		DebugLog("Error marshalling settings: %v", err) // Debug
 		return err
 	}
-	fmt.Println("Settings marshaled, writing to file...") // Log marshaling success
-	//return os.WriteFile(settingsFile, b, 0644)
+	DebugLog("Settings marshaled, writing to file...") // Log marshaling success
 	err = os.WriteFile(settingsFile, b, 0644)
 	if err != nil {
-		log.Println("Error writing to file:", err) // Debug
-	} else {
-		log.Println("Settings saved successfully!") // Debug
+		DebugLog("Error writing to file: %v", err) // Debug
 	}
 	// Update the Fail2ban action file
-	return writeFail2banAction(currentSettings.AlertCountries)
+	return writeFail2banAction()
 }
 
 // GetSettings returns a copy of the current settings
@@ -368,7 +393,7 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 	settingsLock.Lock()
 	defer settingsLock.Unlock()
 
-	fmt.Println("Locked settings for update") // Log lock acquisition
+	DebugLog("--- Locked settings for update ---") // Log lock acquisition
 
 	old := currentSettings
 
@@ -377,9 +402,10 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 		old.IgnoreIP != new.IgnoreIP ||
 		old.Bantime != new.Bantime ||
 		old.Findtime != new.Findtime ||
-		old.Maxretry != new.Maxretry ||
+		//old.Maxretry != new.Maxretry ||
 		old.Destemail != new.Destemail ||
-		old.Sender != new.Sender {
+		//old.Sender != new.Sender {
+		old.Maxretry != new.Maxretry {
 		new.ReloadNeeded = true
 	} else {
 		// preserve previous ReloadNeeded if it was already true
@@ -392,7 +418,7 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 	}
 
 	currentSettings = new
-	fmt.Println("New settings applied:", currentSettings) // Log settings applied
+	DebugLog("New settings applied: %v", currentSettings) // Log settings applied
 
 	// persist to file
 	if err := saveSettings(); err != nil {

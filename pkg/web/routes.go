@@ -37,6 +37,7 @@ func RegisterRoutes(r *gin.Engine) {
 		// settings
 		api.GET("/settings", GetSettingsHandler)
 		api.POST("/settings", UpdateSettingsHandler)
+		api.POST("/settings/test-email", TestEmailHandler)
 
 		// filter debugger
 		api.GET("/filters", ListFiltersHandler)
@@ -46,5 +47,8 @@ func RegisterRoutes(r *gin.Engine) {
 
 		// Reload endpoint
 		api.POST("/fail2ban/reload", ReloadFail2banHandler)
+
+		// Handle Fail2Ban notifications
+		api.POST("/ban", BanNotificationHandler)
 	}
 }
