@@ -230,8 +230,8 @@ func IndexHandler(c *gin.Context) {
 
 // GetJailFilterConfigHandler returns the raw filter config for a given jail
 func GetJailFilterConfigHandler(c *gin.Context) {
-	fmt.Println("----------------------------")
-	fmt.Println("GetJailFilterConfigHandler called (handlers.go)") // entry point
+	config.DebugLog("----------------------------")
+	config.DebugLog("GetJailFilterConfigHandler called (handlers.go)") // entry point
 	jail := c.Param("jail")
 	cfg, err := fail2ban.GetJailConfig(jail)
 	if err != nil {

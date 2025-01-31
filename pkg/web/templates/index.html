@@ -350,6 +350,13 @@ function showSection(sectionId) {
   if (sectionId === 'settingsSection') {
     loadSettings();
   }
+
+  // Close navbar on mobile when clicking a menu item
+  let navbar = document.getElementById('navbarSupportedContent');
+  if (navbar.classList.contains('show')) {
+    let navbarToggler = document.querySelector('.navbar-toggler');
+    navbarToggler.click();
+  }
 }
 
 //*******************************************************************
