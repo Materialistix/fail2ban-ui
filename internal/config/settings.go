@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -73,11 +72,12 @@ var (
 func init() {
 	// Attempt to load existing file; if it doesn't exist, create with defaults.
 	if err := loadSettings(); err != nil {
-		fmt.Println("App settings not found, initializing new from jail.local (if exist):", err)
+		fmt.Println("App settings not found, initializing from jail.local (if exist)")
 		if err := initializeFromJailFile(); err != nil {
 			fmt.Println("Error reading jail.local:", err)
 		}
 		setDefaults()
+		fmt.Println("Initialized successfully.")
 
 		// save defaults to file
 		if err := saveSettings(); err != nil {
@@ -251,7 +251,7 @@ func ensureJailDConfig() error {
 	// Check if the file already exists
 	if _, err := os.Stat(jailDFile); err == nil {
 		// File already exists, do nothing
-		fmt.Println("Custom jail.d configuration already exists.")
+		DebugLog("Custom jail.d configuration already exists.")
 		return nil
 	}
 
@@ -268,7 +268,7 @@ action_mwlg = %(action_)s
 		return fmt.Errorf("failed to write jail.d config: %v", err)
 	}
 
-	fmt.Println("Created custom jail.d configuration at:", jailDFile)
+	DebugLog("Created custom jail.d configuration at: %v", jailDFile)
 	return nil
 }
 
@@ -317,14 +317,14 @@ logpath = /dev/null
 		return fmt.Errorf("failed to write action file: %w", err)
 	}
 
-	fmt.Printf("Action file successfully written to %s\n", actionFile)
+	DebugLog("Custom-action file successfully written to %s\n", actionFile)
 	return nil
 }
 
 // loadSettings reads fail2ban-ui-settings.json into currentSettings.
 func loadSettings() error {
-	fmt.Println("----------------------------")
-	fmt.Println("loadSettings called (settings.go)") // entry point
+	DebugLog("----------------------------")
+	DebugLog("loadSettings called (settings.go)") // entry point
 	data, err := os.ReadFile(settingsFile)
 	if os.IsNotExist(err) {
 		return err // triggers setDefaults + save
@@ -346,21 +346,18 @@ func loadSettings() error {
 
 // saveSettings writes currentSettings to JSON
 func saveSettings() error {
-	fmt.Println("----------------------------")
-	fmt.Println("saveSettings called (settings.go)") // entry point
+	DebugLog("----------------------------")
+	DebugLog("saveSettings called (settings.go)") // entry point
 
 	b, err := json.MarshalIndent(currentSettings, "", "  ")
 	if err != nil {
-		fmt.Println("Error marshalling settings:", err) // Debug
+		DebugLog("Error marshalling settings: %v", err) // Debug
 		return err
 	}
-	fmt.Println("Settings marshaled, writing to file...") // Log marshaling success
-	//return os.WriteFile(settingsFile, b, 0644)
+	DebugLog("Settings marshaled, writing to file...") // Log marshaling success
 	err = os.WriteFile(settingsFile, b, 0644)
 	if err != nil {
-		log.Println("Error writing to file:", err) // Debug
-	} else {
-		log.Println("Settings saved successfully!") // Debug
+		DebugLog("Error writing to file: %v", err) // Debug
 	}
 	// Update the Fail2ban action file
 	return writeFail2banAction()
@@ -396,7 +393,7 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 	settingsLock.Lock()
 	defer settingsLock.Unlock()
 
-	fmt.Println("Locked settings for update") // Log lock acquisition
+	DebugLog("--- Locked settings for update ---") // Log lock acquisition
 
 	old := currentSettings
 
@@ -421,7 +418,7 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 	}
 
 	currentSettings = new
-	fmt.Println("New settings applied:", currentSettings) // Log settings applied
+	DebugLog("New settings applied: %v", currentSettings) // Log settings applied
 
 	// persist to file
 	if err := saveSettings(); err != nil {

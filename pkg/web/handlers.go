@@ -81,8 +81,8 @@ func SummaryHandler(c *gin.Context) {
 
 // UnbanIPHandler unbans a given IP in a specific jail.
 func UnbanIPHandler(c *gin.Context) {
-	fmt.Println("----------------------------")
-	fmt.Println("UnbanIPHandler called (handlers.go)") // entry point
+	config.DebugLog("----------------------------")
+	config.DebugLog("UnbanIPHandler called (handlers.go)") // entry point
 	jail := c.Param("jail")
 	ip := c.Param("ip")
 
@@ -93,7 +93,7 @@ func UnbanIPHandler(c *gin.Context) {
 		})
 		return
 	}
-	fmt.Println(ip + " from jail " + jail + " unbanned successfully (handlers.go)")
+	fmt.Println(ip + " from jail " + jail + " unbanned successfully.")
 	c.JSON(http.StatusOK, gin.H{
 		"message": "IP unbanned successfully",
 	})
@@ -112,7 +112,7 @@ func BanNotificationHandler(c *gin.Context) {
 
 	// **DEBUGGING: Log Raw JSON Body**
 	body, _ := io.ReadAll(c.Request.Body)
-	log.Printf("📩 Incoming Ban Notification: %s\n", string(body))
+	config.DebugLog("📩 Incoming Ban Notification: %s\n", string(body))
 
 	// Rebind body so Gin can parse it again (important!)
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
@@ -246,8 +246,8 @@ func GetJailFilterConfigHandler(c *gin.Context) {
 
 // SetJailFilterConfigHandler overwrites the current filter config with new content
 func SetJailFilterConfigHandler(c *gin.Context) {
-	fmt.Println("----------------------------")
-	fmt.Println("SetJailFilterConfigHandler called (handlers.go)") // entry point
+	config.DebugLog("----------------------------")
+	config.DebugLog("SetJailFilterConfigHandler called (handlers.go)") // entry point
 	jail := c.Param("jail")
 
 	// Parse JSON body (containing the new filter content)
@@ -282,16 +282,16 @@ func SetJailFilterConfigHandler(c *gin.Context) {
 
 // GetSettingsHandler returns the entire AppSettings struct as JSON
 func GetSettingsHandler(c *gin.Context) {
-	fmt.Println("----------------------------")
-	fmt.Println("GetSettingsHandler called (handlers.go)") // entry point
+	config.DebugLog("----------------------------")
+	config.DebugLog("GetSettingsHandler called (handlers.go)") // entry point
 	s := config.GetSettings()
 	c.JSON(http.StatusOK, s)
 }
 
 // UpdateSettingsHandler updates the AppSettings from a JSON body
 func UpdateSettingsHandler(c *gin.Context) {
-	fmt.Println("----------------------------")
-	fmt.Println("UpdateSettingsHandler called (handlers.go)") // entry point
+	config.DebugLog("----------------------------")
+	config.DebugLog("UpdateSettingsHandler called (handlers.go)") // entry point
 	var req config.AppSettings
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fmt.Println("JSON binding error:", err) // Debug
@@ -301,7 +301,7 @@ func UpdateSettingsHandler(c *gin.Context) {
 		})
 		return
 	}
-	fmt.Println("JSON binding successful, updating settings (handlers.go)")
+	config.DebugLog("JSON binding successful, updating settings (handlers.go)")
 
 	newSettings, err := config.UpdateSettings(req)
 	if err != nil {
@@ -309,7 +309,7 @@ func UpdateSettingsHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	fmt.Println("Settings updated successfully (handlers.go)")
+	config.DebugLog("Settings updated successfully (handlers.go)")
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":      "Settings updated",
@@ -320,8 +320,8 @@ func UpdateSettingsHandler(c *gin.Context) {
 // ListFiltersHandler returns a JSON array of filter names
 // found as *.conf in /etc/fail2ban/filter.d
 func ListFiltersHandler(c *gin.Context) {
-	fmt.Println("----------------------------")
-	fmt.Println("ListFiltersHandler called (handlers.go)") // entry point
+	config.DebugLog("----------------------------")
+	config.DebugLog("ListFiltersHandler called (handlers.go)") // entry point
 	dir := "/etc/fail2ban/filter.d"
 
 	files, err := os.ReadDir(dir)
@@ -344,8 +344,8 @@ func ListFiltersHandler(c *gin.Context) {
 }
 
 func TestFilterHandler(c *gin.Context) {
-	fmt.Println("----------------------------")
-	fmt.Println("TestFilterHandler called (handlers.go)") // entry point
+	config.DebugLog("----------------------------")
+	config.DebugLog("TestFilterHandler called (handlers.go)") // entry point
 	var req struct {
 		FilterName string   `json:"filterName"`
 		LogLines   []string `json:"logLines"`
@@ -361,8 +361,8 @@ func TestFilterHandler(c *gin.Context) {
 
 // ApplyFail2banSettings updates /etc/fail2ban/jail.local [DEFAULT] with our JSON
 func ApplyFail2banSettings(jailLocalPath string) error {
-	fmt.Println("----------------------------")
-	fmt.Println("ApplyFail2banSettings called (handlers.go)") // entry point
+	config.DebugLog("----------------------------")
+	config.DebugLog("ApplyFail2banSettings called (handlers.go)") // entry point
 	s := config.GetSettings()
 
 	// open /etc/fail2ban/jail.local, parse or do a simplistic approach:
@@ -387,8 +387,8 @@ func ApplyFail2banSettings(jailLocalPath string) error {
 
 // ReloadFail2banHandler reloads the Fail2ban service
 func ReloadFail2banHandler(c *gin.Context) {
-	fmt.Println("----------------------------")
-	fmt.Println("ApplyFail2banSettings called (handlers.go)") // entry point
+	config.DebugLog("----------------------------")
+	config.DebugLog("ApplyFail2banSettings called (handlers.go)") // entry point
 
 	// First we write our new settings to /etc/fail2ban/jail.local
 	//	if err := fail2ban.ApplyFail2banSettings("/etc/fail2ban/jail.local"); err != nil {
