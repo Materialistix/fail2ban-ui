@@ -1,0 +1,29 @@
+
+module fail2ban-container-client 1.0;
+
+require {
+	type fail2ban_t;
+	type fail2ban_client_t;
+	type fail2ban_var_run_t;
+	type container_file_t;
+	type httpd_log_t;
+	type container_t;
+	type var_log_t;
+	class sock_file write;
+	class unix_stream_socket connectto;
+    class dir { read search open };
+    class file { read open getattr };
+}
+
+#============= container_t ==============
+allow container_t fail2ban_t:unix_stream_socket connectto;
+allow container_t fail2ban_var_run_t:sock_file write;
+allow container_t httpd_log_t:dir { read search open };
+allow container_t httpd_log_t:file { read open getattr };
+allow container_t var_log_t:dir { read search open };
+allow container_t var_log_t:file { read open getattr };
+
+#============= fail2ban_client_t ==============
+allow fail2ban_client_t container_file_t:dir { read search open };
+allow fail2ban_client_t container_file_t:file { read open getattr };
+allow fail2ban_client_t container_file_t:sock_file write;

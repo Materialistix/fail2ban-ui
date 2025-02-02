@@ -1,0 +1,13 @@
+
+module fail2ban-container-ui 1.0;
+
+require {
+	type fail2ban_log_t;
+	type etc_t;
+	type container_t;
+	class file { open read write };
+}
+
+#============= container_t ==============
+allow container_t etc_t:file write;
+allow container_t fail2ban_log_t:file { open read };

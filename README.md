@@ -1,101 +1,133 @@
-# Fail2ban UI
+# **Fail2Ban UI**
 
-A Swissmade, management interface for [Fail2ban](https://www.fail2ban.org/).
-It provides a modern dashboard to currently:
+🚀 **Fail2Ban-UI** is a Swiss-made **web-based management interface** for [Fail2Ban](https://www.fail2ban.org/).
+It provides an intuitive dashboard to **monitor, configure, and manage Fail2Ban** in real time.
 
-- View all Fail2ban jails and banned IPs
-- Unban IP addresses directly
-- Edit and save jail/filter configs
-- Reload Fail2ban when needed
-- See recent ban events
-- More to come...
+Developed by **[Swissmakers GmbH](https://swissmakers.ch)**.
 
-Built by [Swissmakers GmbH](https://swissmakers.ch).
+## **✨ Features**
 
----
+✅ **Real-time Dashboard**
+- View **all active Fail2Ban jails** and **banned IPs** in a clean UI
+- Displays **live ban events**
 
-## Features
+✅ **Ban & Unban Management**
+- **Unban IPs** directly via the UI
+- **Search** for banned IPs accross all active jails
 
-1. **Basic Real-time Dashboard**  
-   - Automatically loads all jails, banned IPs, and last 5 ban events on page load.
+✅ **Fail2Ban Configuration Management**
+- **Edit & Save** active Fail2Ban jail/filter configs
+- Get automatic **email alerts** for specific country-based bans
+- Configure own SMTP settings for email alerts (STARTTLS only)
+- Adjust default ban time, find time, and set ignore IPs
+- Auto-detects changes and prompts for **reload** to apply
+- Enable debug-mode for detailed module logs
 
-2. **Unban IPs**  
-   - Unban any blocked IP without needing direct CLI access.
+✅ **Mobile-Friendly & Responsive UI / Fast**
+- Optimized for **mobile & desktop**
+- Powered by **Bootstrap 5**
+- **Go-based backend** ensures minimal resource usage
 
-3. **Edit Fail2ban Configs**  
-   - Click on any jail name to open a modal with raw config contents (from `/etc/fail2ban/filter.d/*.conf` by default).  
-   - Save changes, then reload Fail2ban.
+✅ **Systemd & SELinux Support**
+- **Run as a systemd service** (Standalone or Container)
+- **Supports SELinux** for secure execution (also container version)
 
-4. **Responsive UI**  
-   - Built with [Bootstrap 5](https://getbootstrap.com/).
+## **📸 Screenshots**
+Some images from the UI in action:
 
-5. **Loading Overlay & Reload Banner**  
-   - Displays a loading spinner for all operations.  
-   - Shows a reload banner when configuration changes occur.
+| Dashboard | Search | Filter Configuration |
+|-----------|-------------|--------------------|
+| ![Dashboard](./screenshots/0_Dashboard.jpg) | ![Filter Debug](./screenshots/1_Dashboard_search.jpg) | ![Jail Config](./screenshots/3_Dashboard_edit_filter.jpg) |
 
----
-
-## Requirements
-
-- **Go 1.22.9+** (module-compatible)
-- **Fail2ban** installed and running
-- **Linux** environment with permissions to run `fail2ban-client` and read/write config files (e.g., `/etc/fail2ban/filter.d/`)
-- Sufficient privileges to reload Fail2ban (run as `sudo` or configure your system accordingly)
-
----
-
-## Installation & Usage
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/swissmakers/fail2ban-ui.git
-   cd fail2ban-ui
-   ```
-
-2. **Initialize or tidy Go modules** (optional if you already have them):
-   ```bash
-   go mod tidy
-   ```
-
-3. **Run the server** (with `sudo` if necessary):
-   ```bash
-   sudo go run ./cmd/server
-   ```
-   By default, it listens on port `:8080`.
-
-4. **Open the UI**:
-   - Visit [http://localhost:8080/](http://localhost:8080/) (or replace `localhost` with your server IP).
-
-5. **Manage Fail2ban**:
-   - See jails and banned IPs on the main dashboard
-   - Unban IPs via the “Unban” button
-   - Edit jail configs by clicking the jail name
-   - Save your changes, then **reload** Fail2ban using the top banner prompt
+📌 **More screenshots are found [here](./screenshots/)**
 
 ---
 
-## Security Considerations
+## **📥 Installation & Deployment**
 
-- Running this UI typically requires **root** or sudo privileges to execute `fail2ban-client` and manipulate config files.  
-- Consider restricting network access or using authentication (e.g., reverse proxy with Basic Auth or a firewall rule) to ensure only authorized users can access the dashboard.  
-- Make sure your Fail2ban logs and configs aren’t exposed publicly.
+Fail2Ban-UI can be currently deployed in **two main ways**:  
+**1️⃣ Running from local source**  
+**2️⃣ Running as a container**  
+
+### **🔹 Method 1: Running from Local Source**
+To install and run directly on the system:  
+📌 **[Follow the basic systemd setup guide](./deployment/systemd/README.md)**  
+
+```bash
+git clone https://github.com/swissmakers/fail2ban-ui.git /opt/fail2ban-ui
+cd /opt/fail2ban-ui
+go build -o fail2ban-ui ./cmd/main.go
+...
+```
 
 ---
 
-## Contributing
+### **🔹 Method 2: Running as a Container**
+For an easy containerized deployment:  
+📌 **[Follow the basic container deployment guide](./deployment/container/README.md)**  
 
-We welcome pull requests and issues! Please open an [issue](./issues) if you find a bug or have a feature request.
+```bash
+podman run -d \
+  --name fail2ban-ui \
+  --network=host \
+  -v /opt/podman-fail2ban-ui:/config:Z \
+  -v /etc/fail2ban:/etc/fail2ban:Z \
+  -v /var/log:/var/log:ro \
+  -v /var/run/fail2ban:/var/run/fail2ban \
+  -v /usr/share/GeoIP:/usr/share/GeoIP:ro \
+  localhost/fail2ban-ui
+```
+
+> **📌 Note:** The container can also be managed as a **systemd service**.
+
+
+## **🔒 Security Considerations**
+- Fail2Ban-UI requires **root privileges** to interact with Fail2Ban.  
+- **Restrict access** using **firewall rules** or a **reverse proxy** with authentication.  
+- Ensure that Fail2Ban logs/configs **aren't exposed publicly**.  
+
+For **SELinux users**, apply the **Fail2Ban-UI security policies**:  
+```bash
+# Basic rule to allow fail2ban access the fail2ban-ui API
+semodule -i fail2ban-curl-allow.pp
+# Also needed for a secure container deployment
+semodule -i fail2ban-container-ui.pp
+semodule -i fail2ban-container-client.pp
+```
+
+
+## **🛠️ Troubleshooting**
+
+### **UI not accessible?**
+- Ensure **port 8080** is open:
+  ```bash
+  sudo firewall-cmd --add-port=8080/tcp --permanent
+  sudo firewall-cmd --reload
+  ```
+- Check logs:
+  ```bash
+  journalctl -u fail2ban-ui.service -f
+  ```
+
+## **🤝 Contributing**
+We welcome **pull requests** and **feature suggestions**!
 
 1. **Fork** this repository
-2. **Create** a new branch: `git checkout -b feature/my-feature`
-3. **Commit** your changes: `git commit -m 'Add some feature'`
-4. **Push** to the branch: `git push origin feature/my-feature`
-5. **Open** a pull request
+2. **Create** a new branch:  
+   ```bash
+   git checkout -b feature/my-feature
+   ```
+3. **Commit** your changes:  
+   ```bash
+   git commit -m "Add new feature"
+   ```
+4. **Push** to the branch:  
+   ```bash
+   git push origin feature/my-feature
+   ```
+5. **Open** a Pull Request  
 
----
 
-## License
-
-```text
-GNU GENERAL PUBLIC LICENSE, Version 3
-```
+## **📜 License**
+Fail2Ban-UI is licensed under **GNU GENERAL PUBLIC LICENSE, Version 3**.  
+See [`LICENSE`](./LICENSE) for details.  

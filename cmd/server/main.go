@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,8 +22,15 @@ func main() {
 	}
 
 	router := gin.Default()
-	router.LoadHTMLGlob("pkg/web/templates/*") // Load HTML templates from pkg/web/templates
-	web.RegisterRoutes(router)                 // Register routes (IndexHandler, /api/summary, jail/unban/:ip) etc..
+
+	// To detect if running inside a container or not
+	_, container := os.LookupEnv("CONTAINER")
+	if container {
+		router.LoadHTMLGlob("/app/templates/*") // Load HTML templates
+	} else {
+		router.LoadHTMLGlob("pkg/web/templates/*") // Load HTML templates
+	}
+	web.RegisterRoutes(router)
 
 	printWelcomeBanner()
 	log.Println("--- Fail2Ban-UI started in", gin.Mode(), "mode ---")
