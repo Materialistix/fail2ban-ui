@@ -374,7 +374,7 @@ function showSection(sectionId) {
 //*               Fetch data and render dashboard :                 *
 //*******************************************************************
 
-// Fetch summary (jails, stats, last 5 bans)
+// Fetch summary (jails, stats, last bans)
 function fetchSummary() {
   return fetch('/api/summary')
     .then(function(res) { return res.json(); })
@@ -398,6 +398,8 @@ function renderDashboard(data) {
 
   // Add a search bar
   html += `
+  <fieldset class="border p-3 rounded mb-4">
+      <legend class="w-auto px-2"><span data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="The Overview displays the currently enabled jails that you have added to your jail.local configuration.">Overview active Jails and Blocks</span></legend>
   <div class="mb-3">
     <label for="ipSearch" class="form-label">Search Banned IPs</label>
     <input type="text" id="ipSearch" class="form-control" placeholder="Enter IP address to search" onkeyup="filterIPs()">
@@ -409,7 +411,6 @@ function renderDashboard(data) {
     html += '<p>No jails found.</p>';
   } else {
     html += ''
-      + '<h2><span data-bs-toggle="tooltip" data-bs-placement="top" title="The Overview displays the currently enabled jails that you have added to your jail.local configuration.">Overview</span></h2>'
       + '<div class="table-responsive">'
       + '<table class="table table-striped" id="jailsTable">'
       + '  <thead>'
@@ -437,11 +438,13 @@ function renderDashboard(data) {
         + '</tr>';
     });
 
-    html += '</tbody></table></div>';
+    html += '</tbody></table>';
+    html += '</div></fieldset>';
   }
 
   // Last 5 bans
-  html += '<h2>Last 5 Ban Events</h2>';
+  html += '<fieldset class="border p-3 rounded mb-4">';
+  html += '  <legend class="w-auto px-2">Last 5 Ban Events</legend>';
   if (!data.lastBans || data.lastBans.length === 0) {
     html += '<p>No recent bans found.</p>';
   } else {
@@ -468,7 +471,7 @@ function renderDashboard(data) {
         + '</tr>';
     });
 
-    html += '</tbody></table>';
+    html += '</tbody></table></fieldset>';
   }
 
   document.getElementById('dashboard').innerHTML = html;
