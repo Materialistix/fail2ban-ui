@@ -22,6 +22,10 @@ import (
 
 // RegisterRoutes sets up the routes for the Fail2ban UI.
 func RegisterRoutes(r *gin.Engine) {
+	// Serve static files for locales from the "internal/locales" directory.
+	// (This makes the translation files available under the /locales/ URL.)
+	r.Static("/locales", "./internal/locales")
+
 	// Render the dashboard
 	r.GET("/", IndexHandler)
 
@@ -30,19 +34,19 @@ func RegisterRoutes(r *gin.Engine) {
 		api.GET("/summary", SummaryHandler)
 		api.POST("/jails/:jail/unban/:ip", UnbanIPHandler)
 
-		// config endpoints
+		// Config endpoints
 		api.GET("/jails/:jail/config", GetJailFilterConfigHandler)
 		api.POST("/jails/:jail/config", SetJailFilterConfigHandler)
 
-		// settings
+		// Settings endpoints
 		api.GET("/settings", GetSettingsHandler)
 		api.POST("/settings", UpdateSettingsHandler)
 		api.POST("/settings/test-email", TestEmailHandler)
 
-		// filter debugger
+		// Filter debugger endpoints
 		api.GET("/filters", ListFiltersHandler)
 		api.POST("/filters/test", TestFilterHandler)
-		// TODO create or generate new filters
+		// TODO: create or generate new filters
 		// api.POST("/filters/generate", GenerateFilterHandler)
 
 		// Reload endpoint
