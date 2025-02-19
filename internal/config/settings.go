@@ -40,6 +40,7 @@ type SMTPSettings struct {
 // AppSettings holds the main UI settings and Fail2ban configuration
 type AppSettings struct {
 	Language       string       `json:"language"`
+	Port           int          `json:"port"`
 	Debug          bool         `json:"debug"`
 	ReloadNeeded   bool         `json:"reloadNeeded"`
 	AlertCountries []string     `json:"alertCountries"`
@@ -57,10 +58,11 @@ type AppSettings struct {
 
 // init paths to key-files
 const (
-	settingsFile = "fail2ban-ui-settings.json" // this is relative to where the app was started
-	jailFile     = "/etc/fail2ban/jail.local"  // Path to jail.local (to override conf-values from jail.conf)
-	jailDFile    = "/etc/fail2ban/jail.d/ui-custom-action.conf"
-	actionFile   = "/etc/fail2ban/action.d/ui-custom-action.conf"
+	settingsFile    = "fail2ban-ui-settings.json" // this is relative to where the app was started
+	defaultjailFile = "/etc/fail2ban/jail.conf"
+	jailFile        = "/etc/fail2ban/jail.local" // Path to jail.local (to override conf-values from jail.conf)
+	jailDFile       = "/etc/fail2ban/jail.d/ui-custom-action.conf"
+	actionFile      = "/etc/fail2ban/action.d/ui-custom-action.conf"
 )
 
 // in-memory copy of settings
@@ -96,6 +98,9 @@ func setDefaults() {
 
 	if currentSettings.Language == "" {
 		currentSettings.Language = "en"
+	}
+	if currentSettings.Port == 0 {
+		currentSettings.Port = 8080
 	}
 	if currentSettings.AlertCountries == nil {
 		currentSettings.AlertCountries = []string{"ALL"}

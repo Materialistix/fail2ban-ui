@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,7 @@ func main() {
 
 	// Create a new Gin router.
 	router := gin.Default()
+	serverPort := strconv.Itoa(int(settings.Port))
 
 	// Load HTML templates depending on whether the application is running inside a container.
 	_, container := os.LookupEnv("CONTAINER")
@@ -38,18 +40,18 @@ func main() {
 	// Register all application routes, including the static file serving route for locales.
 	web.RegisterRoutes(router)
 
-	printWelcomeBanner()
+	printWelcomeBanner(serverPort)
 	log.Println("--- Fail2Ban-UI started in", gin.Mode(), "mode ---")
-	log.Println("Server listening on port :8080.")
+	log.Println("Server listening on port", serverPort, ".")
 
 	// Start the server on port 8080.
-	if err := router.Run(":8080"); err != nil {
+	if err := router.Run(":", serverPort); err != nil {
 		log.Fatalf("Server crashed: %v", err)
 	}
 }
 
 // printWelcomeBanner prints a cool Tux banner with startup info.
-func printWelcomeBanner() {
+func printWelcomeBanner(appPort string) {
 	greeting := getGreeting()
 	const tuxBanner = `
       .--.
@@ -62,13 +64,13 @@ func printWelcomeBanner() {
 
 Fail2Ban UI - A Swissmade Management Interface
 ----------------------------------------------
-Developers: https://swissmakers.ch
-Mode: %s
-Listening on: http://0.0.0.0:8080
+Developers:   https://swissmakers.ch
+Mode:         %s
+Listening on: http://0.0.0.0:%s
 ----------------------------------------------
 
 `
-	fmt.Printf(tuxBanner, greeting, gin.Mode())
+	fmt.Printf(tuxBanner, greeting, gin.Mode(), appPort)
 }
 
 // getGreeting returns a friendly greeting based on the time of day.
