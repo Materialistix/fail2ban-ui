@@ -37,7 +37,7 @@ func GetJails() ([]string, error) {
 	cmd := exec.Command("fail2ban-client", "status")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("could not get jail information. is fail2ban running? error: %v", err)
+		return nil, fmt.Errorf("error: unable to retrieve jail information. is your fail2ban service running? details: %v", err)
 	}
 
 	var jails []string
