@@ -12,36 +12,43 @@ import (
 )
 
 func main() {
+	// Get application settings from the config package.
 	settings := config.GetSettings()
 
-	// Set Gin mode based on settings
+	// Set Gin mode based on the debug flag in settings.
 	if settings.Debug {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	// Create a new Gin router.
 	router := gin.Default()
 
-	// To detect if running inside a container or not
+	// Load HTML templates depending on whether the application is running inside a container.
 	_, container := os.LookupEnv("CONTAINER")
 	if container {
-		router.LoadHTMLGlob("/app/templates/*") // Load HTML templates
+		// In container, templates are assumed to be in /app/templates
+		router.LoadHTMLGlob("/app/templates/*")
 	} else {
-		router.LoadHTMLGlob("pkg/web/templates/*") // Load HTML templates
+		// When running locally, load templates from pkg/web/templates
+		router.LoadHTMLGlob("pkg/web/templates/*")
 	}
+
+	// Register all application routes, including the static file serving route for locales.
 	web.RegisterRoutes(router)
 
 	printWelcomeBanner()
 	log.Println("--- Fail2Ban-UI started in", gin.Mode(), "mode ---")
 	log.Println("Server listening on port :8080.")
 
+	// Start the server on port 8080.
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Server crashed: %v", err)
 	}
 }
 
-// printWelcomeBanner prints a cool Tux banner with startup info
+// printWelcomeBanner prints a cool Tux banner with startup info.
 func printWelcomeBanner() {
 	greeting := getGreeting()
 	const tuxBanner = `
@@ -64,7 +71,7 @@ Listening on: http://0.0.0.0:8080
 	fmt.Printf(tuxBanner, greeting, gin.Mode())
 }
 
-// getGreeting returns a friendly greeting based on the time of day
+// getGreeting returns a friendly greeting based on the time of day.
 func getGreeting() string {
 	hour := time.Now().Hour()
 	switch {
