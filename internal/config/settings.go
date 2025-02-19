@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -40,6 +41,7 @@ type SMTPSettings struct {
 // AppSettings holds the main UI settings and Fail2ban configuration
 type AppSettings struct {
 	Language       string       `json:"language"`
+	Port           int          `json:"port"`
 	Debug          bool         `json:"debug"`
 	ReloadNeeded   bool         `json:"reloadNeeded"`
 	AlertCountries []string     `json:"alertCountries"`
@@ -57,10 +59,11 @@ type AppSettings struct {
 
 // init paths to key-files
 const (
-	settingsFile = "fail2ban-ui-settings.json" // this is relative to where the app was started
-	jailFile     = "/etc/fail2ban/jail.local"  // Path to jail.local (to override conf-values from jail.conf)
-	jailDFile    = "/etc/fail2ban/jail.d/ui-custom-action.conf"
-	actionFile   = "/etc/fail2ban/action.d/ui-custom-action.conf"
+	settingsFile    = "fail2ban-ui-settings.json" // this file is created, relatively to where the app was started
+	defaultJailFile = "/etc/fail2ban/jail.conf"
+	jailFile        = "/etc/fail2ban/jail.local" // Path to jail.local (to override conf-values from jail.conf)
+	jailDFile       = "/etc/fail2ban/jail.d/ui-custom-action.conf"
+	actionFile      = "/etc/fail2ban/action.d/ui-custom-action.conf"
 )
 
 // in-memory copy of settings
@@ -96,6 +99,9 @@ func setDefaults() {
 
 	if currentSettings.Language == "" {
 		currentSettings.Language = "en"
+	}
+	if currentSettings.Port == 0 {
+		currentSettings.Port = 8080
 	}
 	if currentSettings.AlertCountries == nil {
 		currentSettings.AlertCountries = []string{"ALL"}
@@ -201,7 +207,19 @@ func initializeFail2banAction() error {
 func setupGeoCustomAction() error {
 	file, err := os.Open(jailFile)
 	if err != nil {
-		return err // File not found or inaccessible
+		// Fallback: Copy default file if jail.local is not found
+		if os.IsNotExist(err) {
+			if err := copyFile(defaultJailFile, jailFile); err != nil {
+				return fmt.Errorf("failed to copy default jail.conf to jail.local: %w", err)
+			}
+			fmt.Println("Successfully created jail.local from jail.conf.")
+			file, err = os.Open(jailFile)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err // Other error
+		}
 	}
 	defer file.Close()
 
@@ -244,6 +262,24 @@ func setupGeoCustomAction() error {
 	// Write back the modified lines
 	output := strings.Join(lines, "\n")
 	return os.WriteFile(jailFile, []byte(output), 0644)
+}
+
+// copyFile copies a file from src to dst. If the destination file does not exist, it will be created.
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	return err
 }
 
 // ensureJailDConfig checks if the jail.d file exists and creates it if necessary
