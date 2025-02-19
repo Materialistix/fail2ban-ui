@@ -45,8 +45,8 @@ func main() {
 	log.Println("Server listening on port", serverPort, ".")
 
 	// Start the server on port 8080.
-	if err := router.Run(":", serverPort); err != nil {
-		log.Fatalf("Server crashed: %v", err)
+	if err := router.Run(":" + serverPort); err != nil {
+		log.Fatalf("Could not start server: %v\n", err)
 	}
 }
 
