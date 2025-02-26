@@ -1,7 +1,7 @@
 # =========================================
 #  STAGE 1: Build Fail2Ban UI Binary
 # =========================================
-FROM golang:1.22.9 AS builder
+FROM golang:1.23 AS builder
 
 WORKDIR /app
 
@@ -41,6 +41,7 @@ WORKDIR /config
 COPY --from=builder /app/fail2ban-ui /app/fail2ban-ui
 RUN chown fail2ban:0 /app/fail2ban-ui && chmod +x /app/fail2ban-ui
 COPY --from=builder /app/pkg/web/templates /app/templates
+COPY --from=builder /app/internal/locales /app/locales
 
 # Set environment variables
 ENV CONTAINER=true
