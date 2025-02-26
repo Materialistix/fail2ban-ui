@@ -45,8 +45,8 @@
       height: 4rem;
     }
 
-    /* Reload banner */
-    #reloadBanner {
+    /* Restart banner */
+    #restartBanner {
       display: none;
     }
     
@@ -95,10 +95,10 @@
   </nav>
   <!-- ******************************************************************* -->
 
-  <!-- Reload Banner -->
-  <div id="reloadBanner" class="bg-warning text-dark p-3 text-center">
-    <strong data-i18n="reload_banner.message">Configuration changed!</strong>
-    <button class="btn btn-dark" onclick="reloadFail2ban()" data-i18n="reload_banner.button">Reload Fail2ban</button>
+  <!-- Restart Banner -->
+  <div id="restartBanner" class="bg-warning text-dark p-3 text-center">
+    <strong class="p-2" data-i18n="restart_banner.message">Fail2ban configuration changed! To apply the changes, please: </strong>
+    <button class="btn btn-dark" onclick="restartFail2ban()" data-i18n="restart_banner.button">Restart Service</button>
   </div>
 
   <!-- ******************************************************************* -->
@@ -531,7 +531,7 @@
     var currentJailForConfig = null;
     window.addEventListener('DOMContentLoaded', function() {
       showLoading(true);
-      checkReloadNeeded();
+      checkRestartNeeded();
       fetchSummary().then(function() {
         showLoading(false);
         initializeTooltips(); // Initialize tooltips after fetching and rendering
@@ -558,17 +558,17 @@
     }
 
     // Check if there is still a reload of the fail2ban service needed
-    function checkReloadNeeded() {
+    function checkRestartNeeded() {
       fetch('/api/settings')
         .then(res => res.json())
         .then(data => {
-          if (data.reloadNeeded) {
-            document.getElementById('reloadBanner').style.display = 'block';
+          if (data.restartNeeded) {
+            document.getElementById('restartBanner').style.display = 'block';
           } else {
-            document.getElementById('reloadBanner').style.display = 'none';
+            document.getElementById('restartBanner').style.display = 'none';
           }
         })
-        .catch(err => console.error('Error checking reloadNeeded:', err));
+        .catch(err => console.error('Error checking restartNeeded:', err));
     }
 
     // Load dynamically the other pages when navigating in nav
@@ -828,11 +828,11 @@
           if (data.error) {
             alert("Error saving config: " + data.error);
           } else {
-            console.log("Filter saved successfully. Reload needed? " + data.reloadNeeded);
+            console.log("Filter saved successfully. Restart needed? " + data.restartNeeded);
             var modalEl = document.getElementById('jailConfigModal');
             var modalObj = bootstrap.Modal.getInstance(modalEl);
             modalObj.hide();
-            document.getElementById('reloadBanner').style.display = 'block';
+            document.getElementById('restartBanner').style.display = 'block';
           }
         })
         .catch(function(err) {
@@ -901,7 +901,7 @@
             alert("Error saving jail settings: " + data.error);
           } else {
             // A restart of fail2ban is needed, to enable or disable jails - a reload is not enough
-            document.getElementById('reloadBanner').style.display = 'block';
+            document.getElementById('restartBanner').style.display = 'block';
           }
         })
         .catch(function(err) {
@@ -1014,9 +1014,9 @@
           } else {
             var selectedLang = $('#languageSelect').val();
             loadTranslations(selectedLang);
-            console.log("Settings saved successfully. Reload needed? " + data.reloadNeeded);
-            if (data.reloadNeeded) {
-              document.getElementById('reloadBanner').style.display = 'block';
+            console.log("Settings saved successfully. Restart needed? " + data.restartNeeded);
+            if (data.restartNeeded) {
+              document.getElementById('restartBanner').style.display = 'block';
             }
           }
         })
@@ -1133,19 +1133,19 @@
     }
 
     //*******************************************************************
-    //*                     Reload fail2ban action :                    *
+    //*                     Restart fail2ban action :                    *
     //*******************************************************************
 
-    function reloadFail2ban() {
-      if (!confirm("It can happen that some logs are not parsed during the reload of fail2ban. Reload Fail2ban now?")) return;
+    function restartFail2ban() {
+      if (!confirm("Keep in mind that while fail2ban is restarting, logs are not being parsed and no IP addresses are blocked. Restart fail2ban now? This will take some time.")) return;
       showLoading(true);
-      fetch('/api/fail2ban/reload', { method: 'POST' })
+      fetch('/api/fail2ban/restart', { method: 'POST' })
         .then(function(res) { return res.json(); })
         .then(function(data) {
           if (data.error) {
             alert("Error: " + data.error);
           } else {
-            document.getElementById('reloadBanner').style.display = 'none';
+            document.getElementById('restartBanner').style.display = 'none';
             return fetchSummary();
           }
         })
