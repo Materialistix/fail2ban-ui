@@ -107,7 +107,10 @@
 
   <!-- Dashboard Section -->
   <div id="dashboardSection" class="container my-4">
-    <h1 class="mb-4" data-i18n="dashboard.title">Dashboard</h1>
+    <div class="d-flex align-items-center" style="position: relative;">
+      <h1 class="mb-4 flex-grow-1" data-i18n="dashboard.title">Dashboard</h1>
+      <button class="btn btn-outline-secondary" style="position: absolute; right: 0; top: 0;" onclick="openManageJailsModal()" data-i18n="dashboard.manage_jails">Manage Jails</button>
+    </div>
     <div id="dashboard"></div>
   </div>
 
@@ -148,6 +151,12 @@
             <option value="it">Italiano</option>
             <option value="de_ch">Schwiizerdütsch</option>
           </select>
+        </div>
+        <!-- Fail2Ban UI Port (server) -->
+        <div class="mb-3">
+          <label for="uiPort" class="form-label" data-i18n="settings.server_port">Server Port</label>
+          <input type="number" class="form-control" id="uiPort"
+                 data-i18n-placeholder="settings.server_port_placeholder" placeholder="e.g., 8080" required min="80" max="65535" required />
         </div>
         <!-- Debug Log Output -->
         <div class="mb-3 form-check">
@@ -478,6 +487,26 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="modal.cancel">Cancel</button>
           <button type="button" class="btn btn-primary" onclick="saveJailConfig()" data-i18n="modal.save">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Jails Modal -->
+  <div class="modal fade" id="manageJailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" data-i18n="modal.manage_jails_title">Manage Jails</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Dynamically filled list of jails with toggle switches -->
+          <div id="jailsList"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="modal.cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" onclick="saveManageJails()" data-i18n="modal.save">Save Changes</button>
         </div>
       </div>
     </div>
@@ -814,6 +843,80 @@
         });
     }
 
+    // Function: openManageJailsModal
+    // Fetches the full-list of all jails (from /jails/manage) and builds a list with toggle switches.
+    function openManageJailsModal() {
+      showLoading(true);
+      fetch('/api/jails/manage')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (!data.jails || data.jails.length === 0) {
+            alert("No jails found.");
+            showLoading(false);
+            return;
+          }
+          var html = '<div class="list-group">';
+          data.jails.forEach(function(jail) {
+            var isEnabled = (jail.enabled === true);
+            html += '<div class="list-group-item d-flex justify-content-between align-items-center">';
+            html += '<span>' + jail.jailName + '</span>';
+            html += '<div class="form-check form-switch">';
+            html += '<input class="form-check-input" type="checkbox" id="toggle-' + jail.jailName + '" ' + (isEnabled ? 'checked' : '') + '>';
+            html += '</div>';
+            html += '</div>';
+          });
+          html += '</div>';
+          document.getElementById('jailsList').innerHTML = html;
+          var modalEl = document.getElementById('manageJailsModal');
+          var manageJailsModal = new bootstrap.Modal(modalEl);
+          manageJailsModal.show();
+        })
+        .catch(function(err) {
+          alert("Error fetching jails: " + err);
+        })
+        .finally(function() {
+          showLoading(false);
+        });
+    }
+
+    // Function: saveManageJails
+    // Collects the toggled states from the Manage Jails modal and sends updates to the API.
+    function saveManageJails() {
+      showLoading(true);
+      var updatedJails = {};
+      $('.list-group-item').each(function() {
+        var jailName = $(this).find('span').text();
+        var isEnabled = $(this).find('input[type="checkbox"]').is(':checked');
+        updatedJails[jailName] = isEnabled;
+      });
+      // Send updated states to the API endpoint /api/jails/manage.
+      fetch('/api/jails/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedJails),
+      })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.error) {
+            alert("Error saving jail settings: " + data.error);
+          } else {
+            // A restart of fail2ban is needed, to enable or disable jails - a reload is not enough
+            document.getElementById('reloadBanner').style.display = 'block';
+          }
+        })
+        .catch(function(err) {
+          alert("Error: " + err);
+        })
+        .finally(function() {
+          showLoading(false);
+          var modalEl = document.getElementById('manageJailsModal');
+          var manageJailsModal = bootstrap.Modal.getInstance(modalEl);
+          if (manageJailsModal) {
+            manageJailsModal.hide();
+          }
+        });
+    }
+
     //*******************************************************************
     //*       Load current settings when opening settings page :        *
     //*******************************************************************
@@ -824,6 +927,7 @@
         .then(res => res.json())
         .then(data => {
           document.getElementById('languageSelect').value = data.language || 'en';
+          document.getElementById('uiPort').value = data.port || 8080,
           document.getElementById('debugMode').checked = data.debug || false;
 
           document.getElementById('destEmail').value = data.destemail || '';
@@ -886,6 +990,7 @@
 
       const settingsData = {
         language: document.getElementById('languageSelect').value,
+        port: parseInt(document.getElementById('uiPort').value, 10) || 8080,
         debug: document.getElementById('debugMode').checked,
         destemail: document.getElementById('destEmail').value.trim(),
         alertCountries: selectedCountries.length > 0 ? selectedCountries : ["ALL"],

@@ -233,7 +233,7 @@ func GetJailFilterConfigHandler(c *gin.Context) {
 	config.DebugLog("----------------------------")
 	config.DebugLog("GetJailFilterConfigHandler called (handlers.go)") // entry point
 	jail := c.Param("jail")
-	cfg, err := fail2ban.GetJailConfig(jail)
+	cfg, err := fail2ban.GetFilterConfig(jail)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -260,7 +260,7 @@ func SetJailFilterConfigHandler(c *gin.Context) {
 	}
 
 	// Write the filter config file to /etc/fail2ban/filter.d/<jail>.conf
-	if err := fail2ban.SetJailConfig(jail, req.Config); err != nil {
+	if err := fail2ban.SetFilterConfig(jail, req.Config); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -278,6 +278,49 @@ func SetJailFilterConfigHandler(c *gin.Context) {
 	//		"message":      "Filter updated, reload needed",
 	//		"reloadNeeded": true,
 	//	})
+}
+
+// ManageJailsHandler returns a list of all jails (from jail.local and jail.d)
+// including their enabled status.
+func ManageJailsHandler(c *gin.Context) {
+	config.DebugLog("----------------------------")
+	config.DebugLog("ManageJailsHandler called (handlers.go)") // entry point
+	// Get all jails from jail.local and jail.d directories.
+	// This helper should parse both files and return []fail2ban.JailInfo.
+	jails, err := fail2ban.GetAllJails()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load jails: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"jails": jails})
+}
+
+// UpdateJailManagementHandler updates the enabled state for each jail.
+// Expected JSON format: { "JailName1": true, "JailName2": false, ... }
+// After updating, the Fail2ban service is restarted.
+func UpdateJailManagementHandler(c *gin.Context) {
+	config.DebugLog("----------------------------")
+	config.DebugLog("UpdateJailManagementHandler called (handlers.go)") // entry point
+	var updates map[string]bool
+	if err := c.ShouldBindJSON(&updates); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON: " + err.Error()})
+		return
+	}
+	// Update jail configuration file(s) with the new enabled states.
+	if err := fail2ban.UpdateJailEnabledStates(updates); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update jail settings: " + err.Error()})
+		return
+	}
+	// Restart the Fail2ban service.
+	//if err := fail2ban.RestartFail2ban(); err != nil {
+	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload fail2ban: " + err.Error()})
+	//	return
+	//}
+	if err := config.MarkReloadNeeded(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Jail settings updated successfully"})
 }
 
 // GetSettingsHandler returns the entire AppSettings struct as JSON
@@ -429,7 +472,7 @@ func sendEmail(to, subject, body string, settings config.AppSettings) error {
 	smtpHost := settings.SMTP.Host
 	smtpPort := settings.SMTP.Port
 	auth := LoginAuth(settings.SMTP.Username, settings.SMTP.Password)
-	smtpAddr := fmt.Sprintf("%s:%d", smtpHost, smtpPort)
+	smtpAddr := net.JoinHostPort(smtpHost, fmt.Sprintf("%d", smtpPort))
 
 	// **Choose Connection Type**
 	if smtpPort == 465 {

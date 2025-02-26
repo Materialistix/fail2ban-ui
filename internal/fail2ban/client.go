@@ -17,10 +17,9 @@
 package fail2ban
 
 import (
+	"errors"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -30,9 +29,10 @@ type JailInfo struct {
 	TotalBanned   int      `json:"totalBanned"`
 	NewInLastHour int      `json:"newInLastHour"`
 	BannedIPs     []string `json:"bannedIPs"`
+	Enabled       bool     `json:"enabled"`
 }
 
-// GetJails returns all configured jails using "fail2ban-client status".
+// Get active jails using "fail2ban-client status".
 func GetJails() ([]string, error) {
 	cmd := exec.Command("fail2ban-client", "status")
 	out, err := cmd.CombinedOutput()
@@ -140,33 +140,33 @@ func BuildJailInfos(logPath string) ([]JailInfo, error) {
 	return results, nil
 }
 
-// GetJailConfig returns the config content for a given jail.
-// Example: we assume each jail config is at /etc/fail2ban/filter.d/<jail>.conf
-// Adapt this to your environment.
-func GetJailConfig(jail string) (string, error) {
-	configPath := filepath.Join("/etc/fail2ban/filter.d", jail+".conf")
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read config for jail %s: %v", jail, err)
-	}
-	return string(content), nil
-}
-
-// SetJailConfig overwrites the config file for a given jail with new content.
-func SetJailConfig(jail, newContent string) error {
-	configPath := filepath.Join("/etc/fail2ban/filter.d", jail+".conf")
-	if err := os.WriteFile(configPath, []byte(newContent), 0644); err != nil {
-		return fmt.Errorf("failed to write config for jail %s: %v", jail, err)
-	}
-	return nil
-}
-
 // ReloadFail2ban runs "fail2ban-client reload"
 func ReloadFail2ban() error {
 	cmd := exec.Command("fail2ban-client", "reload")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("fail2ban reload error: %v\nOutput: %s", err, out)
+		return fmt.Errorf("fail2ban reload error: %v\noutput: %s", err, out)
 	}
 	return nil
+}
+
+// RestartFail2ban restarts the Fail2ban service.
+func RestartFail2ban() error {
+	cmd := "systemctl restart fail2ban"
+	out, err := execCommand(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to restart fail2ban: %w - output: %s", err, out)
+	}
+	return nil
+}
+
+// execCommand is a helper function to execute shell commands.
+func execCommand(command string) (string, error) {
+	parts := strings.Fields(command)
+	if len(parts) == 0 {
+		return "", errors.New("no command provided")
+	}
+	cmd := exec.Command(parts[0], parts[1:]...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
 }
