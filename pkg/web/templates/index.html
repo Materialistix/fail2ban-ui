@@ -109,7 +109,7 @@
   <div id="dashboardSection" class="container my-4">
     <div class="d-flex align-items-center" style="position: relative;">
       <h1 class="mb-4 flex-grow-1" data-i18n="dashboard.title">Dashboard</h1>
-      <button class="btn btn-outline-secondary" style="position: absolute; right: 0; top: 0;" onclick="openManageJailsModal()" data-i18n="dashboard.manage_jails" title="This feature is currently being implemented." disabled>Manage Jails</button>
+      <button class="btn btn-outline-secondary" style="position: absolute; right: 0; top: 0;" onclick="openManageJailsModal()" data-i18n="dashboard.manage_jails">Manage Jails</button>
     </div>
     <div id="dashboard"></div>
   </div>
@@ -844,10 +844,10 @@
     }
 
     // Function: openManageJailsModal
-    // Fetches the list of jails (from /api/summary) and builds a list with toggle switches.
+    // Fetches the full-list of all jails (from /jails/manage) and builds a list with toggle switches.
     function openManageJailsModal() {
       showLoading(true);
-      fetch('/api/summary')
+      fetch('/api/jails/manage')
         .then(function(res) { return res.json(); })
         .then(function(data) {
           if (!data.jails || data.jails.length === 0) {
@@ -857,8 +857,7 @@
           }
           var html = '<div class="list-group">';
           data.jails.forEach(function(jail) {
-            // If "enabled" is missing, assume true.
-            var isEnabled = (jail.enabled === undefined || jail.enabled === true);
+            var isEnabled = (jail.enabled === true);
             html += '<div class="list-group-item d-flex justify-content-between align-items-center">';
             html += '<span>' + jail.jailName + '</span>';
             html += '<div class="form-check form-switch">';
@@ -901,8 +900,8 @@
           if (data.error) {
             alert("Error saving jail settings: " + data.error);
           } else {
-            alert("Jail settings updated successfully.");
-            fetchSummary(); // Optionally we refresh the dashboard.
+            // A restart of fail2ban is needed, to enable or disable jails - a reload is not enough
+            document.getElementById('reloadBanner').style.display = 'block';
           }
         })
         .catch(function(err) {

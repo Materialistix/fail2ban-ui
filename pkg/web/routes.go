@@ -34,9 +34,13 @@ func RegisterRoutes(r *gin.Engine) {
 		api.GET("/summary", SummaryHandler)
 		api.POST("/jails/:jail/unban/:ip", UnbanIPHandler)
 
-		// Config endpoints
+		// Routes for jail-filter management (TODO: rename API-call)
 		api.GET("/jails/:jail/config", GetJailFilterConfigHandler)
 		api.POST("/jails/:jail/config", SetJailFilterConfigHandler)
+
+		// Routes for jail management
+		api.GET("/jails/manage", ManageJailsHandler)
+		api.POST("/jails/manage", UpdateJailManagementHandler)
 
 		// Settings endpoints
 		api.GET("/settings", GetSettingsHandler)
@@ -46,6 +50,7 @@ func RegisterRoutes(r *gin.Engine) {
 		// Filter debugger endpoints
 		api.GET("/filters", ListFiltersHandler)
 		api.POST("/filters/test", TestFilterHandler)
+
 		// TODO: create or generate new filters
 		// api.POST("/filters/generate", GenerateFilterHandler)
 

@@ -64,6 +64,8 @@
     "modal.filter_config": "Filter-Konfiguration:",
     "modal.cancel": "Abbräche",
     "modal.save": "Speicherä",
-    "loading": "Lade..."
+    "loading": "Lade...",
+    "dashboard.manage_jails": "Jails ala oder absteue",
+    "modal.manage_jails_title": "Jails ala oder absteue"
   }
   

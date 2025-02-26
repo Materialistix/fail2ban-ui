@@ -64,5 +64,7 @@
   "modal.filter_config": "Configuración del filtro:",
   "modal.cancel": "Cancelar",
   "modal.save": "Guardar",
-  "loading": "Cargando..."
+  "loading": "Cargando...",
+  "dashboard.manage_jails": "Administrar jails",
+  "modal.manage_jails_title": "Administrar jails"
 }
