@@ -54,8 +54,8 @@ func RegisterRoutes(r *gin.Engine) {
 		// TODO: create or generate new filters
 		// api.POST("/filters/generate", GenerateFilterHandler)
 
-		// Reload endpoint
-		api.POST("/fail2ban/reload", ReloadFail2banHandler)
+		// Restart endpoint
+		api.POST("/fail2ban/restart", RestartFail2banHandler)
 
 		// Handle Fail2Ban notifications
 		api.POST("/ban", BanNotificationHandler)

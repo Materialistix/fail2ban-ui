@@ -43,7 +43,7 @@ type AppSettings struct {
 	Language       string       `json:"language"`
 	Port           int          `json:"port"`
 	Debug          bool         `json:"debug"`
-	ReloadNeeded   bool         `json:"reloadNeeded"`
+	RestartNeeded  bool         `json:"restartNeeded"`
 	AlertCountries []string     `json:"alertCountries"`
 	SMTP           SMTPSettings `json:"smtp"`
 
@@ -406,25 +406,25 @@ func GetSettings() AppSettings {
 	return currentSettings
 }
 
-// MarkReloadNeeded sets reloadNeeded = true and saves JSON
-func MarkReloadNeeded() error {
+// MarkRestartNeeded sets restartNeeded = true and saves JSON
+func MarkRestartNeeded() error {
 	settingsLock.Lock()
 	defer settingsLock.Unlock()
 
-	currentSettings.ReloadNeeded = true
+	currentSettings.RestartNeeded = true
 	return saveSettings()
 }
 
-// MarkReloadDone sets reloadNeeded = false and saves JSON
-func MarkReloadDone() error {
+// MarkRestartDone sets restartNeeded = false and saves JSON
+func MarkRestartDone() error {
 	settingsLock.Lock()
 	defer settingsLock.Unlock()
 
-	currentSettings.ReloadNeeded = false
+	currentSettings.RestartNeeded = false
 	return saveSettings()
 }
 
-// UpdateSettings merges new settings with old and sets reloadNeeded if needed
+// UpdateSettings merges new settings with old and sets restartNeeded if needed
 func UpdateSettings(new AppSettings) (AppSettings, error) {
 	settingsLock.Lock()
 	defer settingsLock.Unlock()
@@ -442,15 +442,15 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 		old.Destemail != new.Destemail ||
 		//old.Sender != new.Sender {
 		old.Maxretry != new.Maxretry {
-		new.ReloadNeeded = true
+		new.RestartNeeded = true
 	} else {
-		// preserve previous ReloadNeeded if it was already true
-		new.ReloadNeeded = new.ReloadNeeded || old.ReloadNeeded
+		// preserve previous RestartNeeded if it was already true
+		new.RestartNeeded = new.RestartNeeded || old.RestartNeeded
 	}
 
 	// Countries change? Currently also requires a reload
 	if !equalStringSlices(old.AlertCountries, new.AlertCountries) {
-		new.ReloadNeeded = true
+		new.RestartNeeded = true
 	}
 
 	currentSettings = new

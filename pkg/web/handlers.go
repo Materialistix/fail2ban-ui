@@ -266,7 +266,7 @@ func SetJailFilterConfigHandler(c *gin.Context) {
 	}
 
 	// Mark reload needed in our UI settings
-	//	if err := config.MarkReloadNeeded(); err != nil {
+	//	if err := config.MarkRestartNeeded(); err != nil {
 	//		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	//		return
 	//	}
@@ -276,7 +276,7 @@ func SetJailFilterConfigHandler(c *gin.Context) {
 	// Return a simple JSON response without forcing a blocking alert
 	//	c.JSON(http.StatusOK, gin.H{
 	//		"message":      "Filter updated, reload needed",
-	//		"reloadNeeded": true,
+	//		"restartNeeded": true,
 	//	})
 }
 
@@ -316,7 +316,7 @@ func UpdateJailManagementHandler(c *gin.Context) {
 	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload fail2ban: " + err.Error()})
 	//	return
 	//}
-	if err := config.MarkReloadNeeded(); err != nil {
+	if err := config.MarkRestartNeeded(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -355,8 +355,8 @@ func UpdateSettingsHandler(c *gin.Context) {
 	config.DebugLog("Settings updated successfully (handlers.go)")
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":      "Settings updated",
-		"reloadNeeded": newSettings.ReloadNeeded,
+		"message":       "Settings updated",
+		"restartNeeded": newSettings.RestartNeeded,
 	})
 }
 
@@ -428,8 +428,8 @@ func ApplyFail2banSettings(jailLocalPath string) error {
 	return os.WriteFile(jailLocalPath, []byte(content), 0644)
 }
 
-// ReloadFail2banHandler reloads the Fail2ban service
-func ReloadFail2banHandler(c *gin.Context) {
+// RestartFail2banHandler reloads the Fail2ban service
+func RestartFail2banHandler(c *gin.Context) {
 	config.DebugLog("----------------------------")
 	config.DebugLog("ApplyFail2banSettings called (handlers.go)") // entry point
 
@@ -439,18 +439,18 @@ func ReloadFail2banHandler(c *gin.Context) {
 	//		return
 	//	}
 
-	// Then reload
-	if err := fail2ban.ReloadFail2ban(); err != nil {
+	// Then restart
+	if err := fail2ban.RestartFail2ban(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// We set reload done in config
-	if err := config.MarkReloadDone(); err != nil {
+	// We set restart done in config
+	if err := config.MarkRestartDone(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Fail2ban reloaded successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Fail2ban restarted successfully"})
 }
 
 // *******************************************************************
