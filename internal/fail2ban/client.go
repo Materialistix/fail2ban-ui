@@ -19,6 +19,7 @@ package fail2ban
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -152,6 +153,11 @@ func ReloadFail2ban() error {
 
 // RestartFail2ban restarts the Fail2ban service.
 func RestartFail2ban() error {
+
+	// Check if running inside a container.
+	if _, container := os.LookupEnv("CONTAINER"); container {
+		return fmt.Errorf("restart not supported inside container; please restart fail2ban on the host")
+	}
 	cmd := "systemctl restart fail2ban"
 	out, err := execCommand(cmd)
 	if err != nil {

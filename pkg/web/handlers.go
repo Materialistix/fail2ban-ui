@@ -439,13 +439,22 @@ func RestartFail2banHandler(c *gin.Context) {
 	//		return
 	//	}
 
-	// Then restart
-	if err := fail2ban.RestartFail2ban(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	// Attempt to restart the fail2ban service.
+	restartErr := fail2ban.RestartFail2ban()
+	if restartErr != nil {
+		// Check if running inside a container.
+		if _, container := os.LookupEnv("CONTAINER"); container {
+			// In a container, the restart command may fail (since fail2ban runs on the host).
+			// Log the error and continue, so we can mark the restart as done.
+			log.Printf("Warning: restart failed inside container (expected behavior): %v", restartErr)
+		} else {
+			// On the host, a restart error is not acceptable.
+			c.JSON(http.StatusInternalServerError, gin.H{"error": restartErr.Error()})
+			return
+		}
 	}
 
-	// We set restart done in config
+	// Only call MarkRestartDone if we either successfully restarted the service or we are in a container.
 	if err := config.MarkRestartDone(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
