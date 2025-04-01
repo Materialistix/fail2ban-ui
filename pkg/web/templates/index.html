@@ -535,6 +535,7 @@
       fetchSummary().then(function() {
         showLoading(false);
         initializeTooltips(); // Initialize tooltips after fetching and rendering
+        initializeSearch();
         getTranslationsSettingsOnPageload();
       });
     });
@@ -547,6 +548,18 @@
       });
     }
 
+    // Function to initialize the IP search
+    function initializeSearch() {
+      const ipSearch = document.getElementById("ipSearch");
+      if (ipSearch) {
+        ipSearch.addEventListener("keypress", function(event) {
+          const char = String.fromCharCode(event.which);
+          if (!/[0-9.]/.test(char)) {
+            event.preventDefault();
+          }
+        });
+      }
+    }
     // Toggle the loading overlay (with !important)
     function showLoading(show) {
       var overlay = document.getElementById('loading-overlay');
@@ -630,7 +643,7 @@
           <legend class="w-auto px-2"><span data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="The Overview displays the currently enabled jails that you have added to your jail.local configuration." data-i18n="dashboard.overview">Overview active Jails and Blocks</span></legend>
       <div class="mb-3">
         <label for="ipSearch" class="form-label" data-i18n="dashboard.search_label">Search Banned IPs</label>
-        <input type="text" id="ipSearch" class="form-control" placeholder="Enter IP address to search" data-i18n-placeholder="dashboard.search_placeholder" onkeyup="filterIPs()">
+        <input type="text" id="ipSearch" class="form-control" placeholder="Enter IP address to search" data-i18n-placeholder="dashboard.search_placeholder" onkeyup="filterIPs()" pattern="[0-9.]*">
       </div>
       `;
 
@@ -727,30 +740,46 @@
 
     // Filter IPs on dashboard table
     function filterIPs() {
-      const query = document.getElementById("ipSearch").value.toLowerCase();
-      const rows = document.querySelectorAll("#jailsTable .jail-row");
+      const input = document.getElementById("ipSearch");
+      const query = input.value.trim();
 
-      rows.forEach((row) => {
-        const ipSpans = row.querySelectorAll("ul li span");
-        let matchFound = false;
+      // Process each row in the jails table
+      document.querySelectorAll("#jailsTable .jail-row").forEach(row => {
+        // Get all list items (each representing an IP entry)
+        const ipItems = row.querySelectorAll("ul li");
+        let rowHasMatch = false;
 
-        ipSpans.forEach((span) => {
-          const originalText = span.textContent;
-          const ipText = originalText.toLowerCase();
+        ipItems.forEach(li => {
+          // Find the span that contains the IP text.
+          const span = li.querySelector("span.me-auto");
+          if (!span) return;
 
-          if (query && ipText.includes(query)) {
-            matchFound = true;
-            const highlightedText = originalText.replace(
-              new RegExp(query, "gi"),
-              (match) => `<mark>${match}</mark>`
-            );
-            span.innerHTML = highlightedText;
+          // Retrieve the original IP text from a data attribute; if not set, save it.
+          let originalIP = span.getAttribute("data-original");
+          if (!originalIP) {
+            originalIP = span.textContent.trim();
+            span.setAttribute("data-original", originalIP);
+          }
+
+          if (query === "") {
+            // When the search query is empty, show all IP items and reset their inner HTML.
+            li.style.display = "";
+            span.innerHTML = originalIP;
+            rowHasMatch = true;
+          } else if (originalIP.includes(query)) {
+            // If the IP contains the query, show the item and highlight the matching text.
+            li.style.display = "";
+            const regex = new RegExp(query, "gi");
+            span.innerHTML = originalIP.replace(regex, (match) => `<mark>${match}</mark>`);
+            rowHasMatch = true;
           } else {
-            span.innerHTML = originalText;
+            // Hide the IP item if it does not match.
+            li.style.setProperty("display", "none", "important");
           }
         });
 
-        row.style.display = matchFound || !query ? "" : "none";
+        // If none of the IP items in the row match the query, hide the entire row.
+        row.style.display = rowHasMatch ? "" : "none";
       });
     }
 
