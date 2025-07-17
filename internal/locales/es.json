@@ -3,7 +3,7 @@
   "nav.dashboard": "Panel de control",
   "nav.filter_debug": "Depuración de filtros",
   "nav.settings": "Configuración",
-  "restart_banner.message": "¡Configuración de Fail2ban modificada! Para aplicar los cambios, por favor: ",
+  "restart_banner.message": "¡Configuración de Fail2ban modificada. Para aplicar los cambios, por favor ",
   "restart_banner.button": "Reiniciar servicio",
   "dashboard.title": "Panel de control",
   "dashboard.overview": "Resumen de Jails y Bloqueos activos",

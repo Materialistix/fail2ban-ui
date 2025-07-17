@@ -22,21 +22,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title data-i18n="page.title">Fail2ban UI Dashboard</title>
-  <!-- Bootstrap 5 (CDN) -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Select2 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
   <style>
     /* Loading overlay styling */
     #loading-overlay {
-      display: none; /* hidden by default */
+      display: none;
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
       background: rgba(0,0,0,0.5);
-      z-index: 9999; /* on top */
+      z-index: 9999;
       align-items: center;
       justify-content: center;
       backdrop-filter: blur(4px);
@@ -44,15 +46,10 @@
       opacity: 0;
       transition: opacity 0.4s ease;
     }
-
+    
     #loading-overlay.show {
-        display: flex;
-        opacity: 1;
-    }
-
-    .spinner-border {
-      width: 4rem;
-      height: 4rem;
+      display: flex;
+      opacity: 1;
     }
 
     /* Restart banner */
@@ -60,481 +57,594 @@
       display: none;
     }
     
-    /* Improve table readability on small screens */
-    @media (max-width: 575px) {
-      .table th,
-      .table td {
-        font-size: 0.8rem;
-        padding: 5px;
-      }
-      .table thead {
-        font-size: 1rem;
-      }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+    
+    /* Custom select2 styling to match Tailwind */
+    .select2-container--default .select2-selection--multiple {
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      padding: 0.25rem 0.5rem;
+      min-height: 42px;
+    }
+    
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+      background-color: #3b82f6;
+      border: 1px solid #3b82f6;
+      color: white;
+      border-radius: 0.25rem;
+      padding: 0 0.5rem;
+    }
+    
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+      color: white;
+      margin-right: 0.25rem;
+    }
+    
+    /* Custom modal styling */
+    .modal-content {
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+    
+    /* Custom tooltip styling */
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .tooltip .tooltip-text {
+      visibility: hidden;
+      width: 200px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -100px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .tooltip:hover .tooltip-text {
+      visibility: visible;
+      opacity: 1;
+    }
+    
+    /* Custom mark styling for search highlights */
+    mark {
+      background-color: #fef08a;
+      padding: 0.1em 0.2em;
+      border-radius: 0.25em;
     }
   </style>
 </head>
 
-<body class="bg-light">
-  <!-- ******************************************************************* -->
-  <!--                            NAVIGATION :                             -->
-  <!-- ******************************************************************* -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="#">
-        <strong>Fail2ban UI</strong>
-      </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" 
-              aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-  
-      <div class="collapse navbar-collapse" id="navbarSupportedContent">
-        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-          <li class="nav-item">
-            <a class="nav-link" href="#" onclick="showSection('dashboardSection')" data-i18n="nav.dashboard">Dashboard</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#" onclick="showSection('filterSection')" data-i18n="nav.filter_debug">Filter Debug</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#" onclick="showSection('settingsSection')" data-i18n="nav.settings">Settings</a>
-          </li>
-        </ul>
+<body class="bg-gray-50 overflow-y-scroll">
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50 backdrop-blur-sm">
+  <div class="h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="bg-blue-600 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <span class="text-xl font-bold">Fail2ban UI</span>
+          </div>
+        </div>
+        <div class="hidden md:block">
+          <div class="ml-10 flex items-baseline space-x-4">
+            <a href="#" onclick="showSection('dashboardSection')" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.dashboard">Dashboard</a>
+            <a href="#" onclick="showSection('filterSection')" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.filter_debug">Filter Debug</a>
+            <a href="#" onclick="showSection('settingsSection')" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.settings">Settings</a>
+          </div>
+        </div>
+        <div class="md:hidden">
+          <button type="button" class="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white hover:bg-blue-700 focus:outline-none" onclick="toggleMobileMenu()">
+            <svg class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Mobile menu -->
+    <div id="mobileMenu" class="hidden md:hidden">
+      <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+        <a href="#" onclick="showSection('dashboardSection')" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.dashboard">Dashboard</a>
+        <a href="#" onclick="showSection('filterSection')" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.filter_debug">Filter Debug</a>
+        <a href="#" onclick="showSection('settingsSection')" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.settings">Settings</a>
       </div>
     </div>
   </nav>
   <!-- ******************************************************************* -->
 
   <!-- Restart Banner -->
-  <div id="restartBanner" class="bg-warning text-dark p-3 text-center">
-    <strong class="p-2" data-i18n="restart_banner.message">Fail2ban configuration changed! To apply the changes, please: </strong>
-    <button class="btn btn-dark" onclick="restartFail2ban()" data-i18n="restart_banner.button">Restart Service</button>
+  <div id="restartBanner" class="bg-yellow-400 text-gray-900 p-3 text-center">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-center gap-4">
+      <strong data-i18n="restart_banner.message">Fail2ban configuration changed! To apply the changes, please: </strong>
+      <button class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors" onclick="restartFail2ban()" data-i18n="restart_banner.button">Restart Service</button>
+    </div>
   </div>
 
-  <!-- ******************************************************************* -->
-  <!--                       APP Sections (Pages) :                        -->
-  <!-- ******************************************************************* -->
-
-  <!-- Dashboard Section -->
-  <div id="dashboardSection" class="container my-4">
-    <div class="d-flex align-items-center">
-      <h1 class="mb-4 flex-grow-1" data-i18n="dashboard.title">Dashboard</h1>
-      <div class="d-flex align-items-center" style="align-self: baseline;">
-        <div class="text-secondary small">
-          Your ext. IP: <span id="external-ip">Loading...</span>
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Dashboard Section -->
+    <div id="dashboardSection">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4 md:mb-0" data-i18n="dashboard.title">Dashboard</h1>
+        <div class="flex items-center space-x-4">
+          <div class="text-sm text-gray-500">
+            Your ext. IP: <span id="external-ip" class="font-medium text-blue-600 hover:underline cursor-pointer">Loading…</span>
+          </div>
+          <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+            onclick="openManageJailsModal()">
+            <i class="fas fa-cog"></i>
+            <span data-i18n="dashboard.manage_jails">Manage Jails</span>
+          </button>
         </div>
-        <button class="btn btn-outline-secondary ms-2"
-          onclick="openManageJailsModal()"
-          data-i18n="dashboard.manage_jails">
-          Manage Jails
-        </button>
       </div>
-
+      
+      <div id="dashboard"></div>
     </div>
-    <div id="dashboard"></div>
-  </div>
 
-  <!-- Filter Debug Section -->
-  <div id="filterSection" style="display: none;" class="container my-4">
-    <h2 data-i18n="filter_debug.title">Filter Debug</h2>
-    <!-- Dropdown of available jail/filters -->
-    <div class="mb-3">
-      <label for="filterSelect" class="form-label" data-i18n="filter_debug.select_filter">Select a Filter</label>
-      <select id="filterSelect" class="form-select"></select>
+    <!-- Filter Debug Section -->
+    <div id="filterSection" class="hidden">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6" data-i18n="filter_debug.title">Filter Debug</h2>
+      
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <!-- Dropdown of available jail/filters -->
+        <div class="mb-4">
+          <label for="filterSelect" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="filter_debug.select_filter">Select a Filter</label>
+          <select id="filterSelect" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+        </div>
+        
+        <!-- Textarea for log lines to test -->
+        <div class="mb-4">
+          <label for="logLinesTextarea" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="filter_debug.log_lines">Log Lines</label>
+          <textarea id="logLinesTextarea" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 h-40" disabled
+                    data-i18n-placeholder="filter_debug.log_lines_placeholder" placeholder="Enter log lines here..."></textarea>
+        </div>
+        
+        <button class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors" onclick="testSelectedFilter()" data-i18n="filter_debug.test_filter">Test Filter</button>
+      </div>
+      
+      <div id="testResults" class="bg-white rounded-lg shadow p-6"></div>
     </div>
-    <!-- Textarea for log lines to test -->
-    <div class="mb-3">
-      <label class="form-label" data-i18n="filter_debug.log_lines">Log Lines</label>
-      <textarea id="logLinesTextarea" class="form-control" rows="6" disabled
-                data-i18n-placeholder="filter_debug.log_lines_placeholder" placeholder="Enter log lines here..."></textarea>
+
+    <!-- Settings Section -->
+    <div id="settingsSection" class="hidden">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6" data-i18n="settings.title">Settings</h2>
+      
+      <form onsubmit="saveSettings(event)" class="space-y-6">
+        <!-- General Settings Group -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4" data-i18n="settings.general">General Settings</h3>
+          
+          <!-- Language Selection -->
+          <div class="mb-4">
+            <label for="languageSelect" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.language">Language</label>
+            <select id="languageSelect" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="it">Italiano</option>
+              <option value="de_ch">Schwiizerdütsch</option>
+            </select>
+          </div>
+          
+          <!-- Fail2Ban UI Port (server) -->
+          <div class="mb-4">
+            <label for="uiPort" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.server_port">Server Port</label>
+            <input type="number" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="uiPort"
+                   data-i18n-placeholder="settings.server_port_placeholder" placeholder="e.g., 8080" required min="80" max="65535" />
+          </div>
+          
+          <!-- Debug Log Output -->
+          <div class="flex items-center">
+            <input type="checkbox" id="debugMode" class="h-4 w-7 text-blue-600 transition duration-150 ease-in-out">
+            <label for="debugMode" class="ml-2 block text-sm text-gray-700" data-i18n="settings.enable_debug">Enable Debug Log</label>
+          </div>
+        </div>
+
+        <!-- Alert Settings Group -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4" data-i18n="settings.alert">Alert Settings</h3>
+          
+          <div class="mb-4">
+            <label for="destEmail" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.destination_email">Destination Email (Alerts Receiver)</label>
+            <input type="email" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="destEmail"
+                   data-i18n-placeholder="settings.destination_email_placeholder" placeholder="alerts@swissmakers.ch" />
+          </div>
+          
+          <div class="mb-4">
+            <label for="alertCountries" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.alert_countries">Alert Countries</label>
+            <p class="text-sm text-gray-500 mb-2" data-i18n="settings.alert_countries_description">
+              Choose the countries for which you want to receive email alerts when a block is triggered.
+            </p>
+            <select id="alertCountries" class="w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" multiple>
+              <option value="ALL">ALL (Every Country)</option>
+              <option value="AF">Afghanistan (AF)</option>
+              <option value="AL">Albania (AL)</option>
+              <option value="DZ">Algeria (DZ)</option>
+              <option value="AD">Andorra (AD)</option>
+              <option value="AO">Angola (AO)</option>
+              <option value="AG">Antigua and Barbuda (AG)</option>
+              <option value="AR">Argentina (AR)</option>
+              <option value="AM">Armenia (AM)</option>
+              <option value="AU">Australia (AU)</option>
+              <option value="AT">Austria (AT)</option>
+              <option value="AZ">Azerbaijan (AZ)</option>
+              <option value="BS">Bahamas (BS)</option>
+              <option value="BH">Bahrain (BH)</option>
+              <option value="BD">Bangladesh (BD)</option>
+              <option value="BB">Barbados (BB)</option>
+              <option value="BY">Belarus (BY)</option>
+              <option value="BE">Belgium (BE)</option>
+              <option value="BZ">Belize (BZ)</option>
+              <option value="BJ">Benin (BJ)</option>
+              <option value="BT">Bhutan (BT)</option>
+              <option value="BO">Bolivia (BO)</option>
+              <option value="BA">Bosnia and Herzegovina (BA)</option>
+              <option value="BW">Botswana (BW)</option>
+              <option value="BR">Brazil (BR)</option>
+              <option value="BN">Brunei (BN)</option>
+              <option value="BG">Bulgaria (BG)</option>
+              <option value="BF">Burkina Faso (BF)</option>
+              <option value="BI">Burundi (BI)</option>
+              <option value="CV">Cabo Verde (CV)</option>
+              <option value="KH">Cambodia (KH)</option>
+              <option value="CM">Cameroon (CM)</option>
+              <option value="CA">Canada (CA)</option>
+              <option value="CF">Central African Republic (CF)</option>
+              <option value="TD">Chad (TD)</option>
+              <option value="CL">Chile (CL)</option>
+              <option value="CN">China (CN)</option>
+              <option value="CO">Colombia (CO)</option>
+              <option value="KM">Comoros (KM)</option>
+              <option value="CG">Congo - Brazzaville (CG)</option>
+              <option value="CD">Congo - Kinshasa (CD)</option>
+              <option value="CR">Costa Rica (CR)</option>
+              <option value="CI">Côte d'Ivoire (CI)</option>
+              <option value="HR">Croatia (HR)</option>
+              <option value="CU">Cuba (CU)</option>
+              <option value="CY">Cyprus (CY)</option>
+              <option value="CZ">Czechia (CZ)</option>
+              <option value="DK">Denmark (DK)</option>
+              <option value="DJ">Djibouti (DJ)</option>
+              <option value="DM">Dominica (DM)</option>
+              <option value="DO">Dominican Republic (DO)</option>
+              <option value="EC">Ecuador (EC)</option>
+              <option value="EG">Egypt (EG)</option>
+              <option value="SV">El Salvador (SV)</option>
+              <option value="GQ">Equatorial Guinea (GQ)</option>
+              <option value="ER">Eritrea (ER)</option>
+              <option value="EE">Estonia (EE)</option>
+              <option value="SZ">Eswatini (SZ)</option>
+              <option value="ET">Ethiopia (ET)</option>
+              <option value="FJ">Fiji (FJ)</option>
+              <option value="FI">Finland (FI)</option>
+              <option value="FR">France (FR)</option>
+              <option value="GA">Gabon (GA)</option>
+              <option value="GM">Gambia (GM)</option>
+              <option value="GE">Georgia (GE)</option>
+              <option value="DE">Germany (DE)</option>
+              <option value="GH">Ghana (GH)</option>
+              <option value="GR">Greece (GR)</option>
+              <option value="GD">Grenada (GD)</option>
+              <option value="GT">Guatemala (GT)</option>
+              <option value="GN">Guinea (GN)</option>
+              <option value="GW">Guinea-Bissau (GW)</option>
+              <option value="GY">Guyana (GY)</option>
+              <option value="HT">Haiti (HT)</option>
+              <option value="HN">Honduras (HN)</option>
+              <option value="HU">Hungary (HU)</option>
+              <option value="IS">Iceland (IS)</option>
+              <option value="IN">India (IN)</option>
+              <option value="ID">Indonesia (ID)</option>
+              <option value="IR">Iran (IR)</option>
+              <option value="IQ">Iraq (IQ)</option>
+              <option value="IE">Ireland (IE)</option>
+              <option value="IL">Israel (IL)</option>
+              <option value="IT">Italy (IT)</option>
+              <option value="JM">Jamaica (JM)</option>
+              <option value="JP">Japan (JP)</option>
+              <option value="JO">Jordan (JO)</option>
+              <option value="KZ">Kazakhstan (KZ)</option>
+              <option value="KE">Kenya (KE)</option>
+              <option value="KI">Kiribati (KI)</option>
+              <option value="KP">North Korea (KP)</option>
+              <option value="KR">South Korea (KR)</option>
+              <option value="KW">Kuwait (KW)</option>
+              <option value="KG">Kyrgyzstan (KG)</option>
+              <option value="LA">Laos (LA)</option>
+              <option value="LV">Latvia (LV)</option>
+              <option value="LB">Lebanon (LB)</option>
+              <option value="LS">Lesotho (LS)</option>
+              <option value="LR">Liberia (LR)</option>
+              <option value="LY">Libya (LY)</option>
+              <option value="LI">Liechtenstein (LI)</option>
+              <option value="LT">Lithuania (LT)</option>
+              <option value="LU">Luxembourg (LU)</option>
+              <option value="MG">Madagascar (MG)</option>
+              <option value="MW">Malawi (MW)</option>
+              <option value="MY">Malaysia (MY)</option>
+              <option value="MV">Maldives (MV)</option>
+              <option value="ML">Mali (ML)</option>
+              <option value="MT">Malta (MT)</option>
+              <option value="MH">Marshall Islands (MH)</option>
+              <option value="MR">Mauritania (MR)</option>
+              <option value="MU">Mauritius (MU)</option>
+              <option value="MX">Mexico (MX)</option>
+              <option value="FM">Micronesia (FM)</option>
+              <option value="LOTR">Middle-earth (LOTR)</option>
+              <option value="MD">Moldova (MD)</option>
+              <option value="MC">Monaco (MC)</option>
+              <option value="MN">Mongolia (MN)</option>
+              <option value="ME">Montenegro (ME)</option>
+              <option value="MA">Morocco (MA)</option>
+              <option value="MZ">Mozambique (MZ)</option>
+              <option value="MM">Myanmar (MM)</option>
+              <option value="NA">Namibia (NA)</option>
+              <option value="NR">Nauru (NR)</option>
+              <option value="NP">Nepal (NP)</option>
+              <option value="NL">Netherlands (NL)</option>
+              <option value="NZ">New Zealand (NZ)</option>
+              <option value="NI">Nicaragua (NI)</option>
+              <option value="NE">Niger (NE)</option>
+              <option value="NG">Nigeria (NG)</option>
+              <option value="NO">Norway (NO)</option>
+              <option value="OM">Oman (OM)</option>
+              <option value="PK">Pakistan (PK)</option>
+              <option value="PW">Palau (PW)</option>
+              <option value="PS">Palestine (PS)</option>
+              <option value="PA">Panama (PA)</option>
+              <option value="PG">Papua New Guinea (PG)</option>
+              <option value="PY">Paraguay (PY)</option>
+              <option value="PE">Peru (PE)</option>
+              <option value="PH">Philippines (PH)</option>
+              <option value="PL">Polland (PL)</option>
+              <option value="PT">Portugal (PT)</option>
+              <option value="QA">Qatar (QA)</option>
+              <option value="RO">Romania (RO)</option>
+              <option value="RU">Russia (RU)</option>
+              <option value="RW">Rwanda (RW)</option>
+              <option value="KN">Saint Kitts and Nevis (KN)</option>
+              <option value="LC">Saint Lucia (LC)</option>
+              <option value="VC">Saint Vincent and the Grenadines (VC)</option>
+              <option value="WS">Samoa (WS)</option>
+              <option value="SM">San Marino (SM)</option>
+              <option value="ST">Sao Tome and Principe (ST)</option>
+              <option value="SA">Saudi Arabia (SA)</option>
+              <option value="SN">Senegal (SN)</option>
+              <option value="RS">Serbia (RS)</option>
+              <option value="SC">Seychelles (SC)</option>
+              <option value="SL">Sierra Leone (SL)</option>
+              <option value="SG">Singapore (SG)</option>
+              <option value="SK">Slovakia (SK)</option>
+              <option value="SI">Slovenia (SI)</option>
+              <option value="SB">Solomon Islands (SB)</option>
+              <option value="SO">Somalia (SO)</option>
+              <option value="ZA">South Africa (ZA)</option>
+              <option value="SS">South Sudan (SS)</option>
+              <option value="ES">Spain (ES)</option>
+              <option value="LK">Sri Lanka (LK)</option>
+              <option value="SD">Sudan (SD)</option>
+              <option value="SR">Suriname (SR)</option>
+              <option value="SE">Sweden (SE)</option>
+              <option value="CH">Switzerland (CH)</option>
+              <option value="SY">Syria (SY)</option>
+              <option value="TW">Taiwan (TW)</option>
+              <option value="TJ">Tajikistan (TJ)</option>
+              <option value="TZ">Tanzania (TZ)</option>
+              <option value="TH">Thailand (TH)</option>
+              <option value="TL">Timor-Leste (TL)</option>
+              <option value="TG">Togo (TG)</option>
+              <option value="TO">Tonga (TO)</option>
+              <option value="TT">Trinidad and Tobago (TT)</option>
+              <option value="TN">Tunisia (TN)</option>
+              <option value="TR">Turkey (TR)</option>
+              <option value="TM">Turkmenistan (TM)</option>
+              <option value="TV">Tuvalu (TV)</option>
+              <option value="UG">Uganda (UG)</option>
+              <option value="UA">Ukraine (UA)</option>
+              <option value="AE">United Arab Emirates (AE)</option>
+              <option value="GB">United Kingdom (GB)</option>
+              <option value="US">United States (US)</option>
+              <option value="UY">Uruguay (UY)</option>
+              <option value="UZ">Uzbekistan (UZ)</option>
+              <option value="VU">Vanuatu (VU)</option>
+              <option value="VE">Venezuela (VE)</option>
+              <option value="VN">Vietnam (VN)</option>
+              <option value="YE">Yemen (YE)</option>
+              <option value="ZM">Zambia (ZM)</option>
+              <option value="ZW">Zimbabwe (ZW)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- SMTP Configuration Group -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4" data-i18n="settings.smtp">SMTP Configuration</h3>
+          
+          <div class="mb-4">
+            <label for="smtpHost" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_host">SMTP Host</label>
+            <input type="text" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="smtpHost"
+                   data-i18n-placeholder="settings.smtp_host_placeholder" placeholder="e.g., smtp.gmail.com" required />
+          </div>
+          
+          <div class="mb-4">
+            <label for="smtpPort" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_port">SMTP Port</label>
+            <select id="smtpPort" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="587" selected>587 (Recommended - STARTTLS)</option>
+              <option value="465" disabled>465 (Not Supported)</option>
+            </select>
+          </div>
+          
+          <div class="mb-4">
+            <label for="smtpUsername" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_username">SMTP Username</label>
+            <input type="text" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="smtpUsername"
+                   data-i18n-placeholder="settings.smtp_username_placeholder" placeholder="e.g., user@example.com" required />
+          </div>
+          
+          <div class="mb-4">
+            <label for="smtpPassword" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_password">SMTP Password</label>
+            <input type="password" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="smtpPassword"
+                   data-i18n-placeholder="settings.smtp_password_placeholder" placeholder="Enter SMTP Password" required />
+          </div>
+          
+          <div class="mb-4">
+            <label for="smtpFrom" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_sender">Sender Email</label>
+            <input type="email" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="smtpFrom"
+                   data-i18n-placeholder="settings.smtp_sender_placeholder" placeholder="noreply@swissmakers.ch" required />
+          </div>
+          
+          <div class="flex items-center mb-4">
+            <input type="checkbox" id="smtpUseTLS" class="h-4 w-7 text-blue-600 transition duration-150 ease-in-out">
+            <label for="smtpUseTLS" class="ml-2 block text-sm text-gray-700" data-i18n="settings.smtp_tls">Use TLS (Recommended)</label>
+          </div>
+          
+          <button type="button" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors" onclick="sendTestEmail()" data-i18n="settings.send_test_email">Send Test Email</button>
+        </div>
+
+        <!-- Fail2Ban Configuration Group -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4" data-i18n="settings.fail2ban">Fail2Ban Configuration</h3>
+          
+          <!-- Bantime Increment -->
+          <div class="flex items-center mb-4">
+            <input type="checkbox" id="bantimeIncrement" class="h-4 w-7 text-blue-600 transition duration-150 ease-in-out" />
+            <label for="bantimeIncrement" class="ml-2 block text-sm text-gray-700" data-i18n="settings.enable_bantime_increment">Enable Bantime Increment</label>
+          </div>
+          
+          <!-- Bantime -->
+          <div class="mb-4">
+            <label for="banTime" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.default_bantime">Default Bantime</label>
+            <input type="text" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="banTime"
+                   data-i18n-placeholder="settings.default_bantime_placeholder" placeholder="e.g., 48h" />
+          </div>
+          
+          <!-- Findtime -->
+          <div class="mb-4">
+            <label for="findTime" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.default_findtime">Default Findtime</label>
+            <input type="text" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="findTime"
+                   data-i18n-placeholder="settings.default_findtime_placeholder" placeholder="e.g., 30m" />
+          </div>
+          
+          <!-- Max Retry -->
+          <div class="mb-4">
+            <label for="maxRetry" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.default_max_retry">Default Max Retry</label>
+            <input type="number" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="maxRetry"
+                   data-i18n-placeholder="settings.default_max_retry_placeholder" placeholder="Enter maximum retries" />
+          </div>
+          
+          <!-- Ignore IPs -->
+          <div class="mb-4">
+            <label for="ignoreIP" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.ignore_ips">Ignore IPs</label>
+            <textarea class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="ignoreIP" rows="2"
+                      data-i18n-placeholder="settings.ignore_ips_placeholder" placeholder="IPs to ignore, separated by spaces"></textarea>
+          </div>
+        </div>
+        
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors" data-i18n="settings.save">Save</button>
+      </form>
     </div>
-    <button class="btn btn-secondary" onclick="testSelectedFilter()" data-i18n="filter_debug.test_filter">Test Filter</button>
-    <hr/>
-    <div id="testResults"></div>
-  </div> 
-
-  <!-- Settings Section -->
-  <div id="settingsSection" style="display: none;" class="container my-4">
-    <h2 data-i18n="settings.title">Settings</h2>
-    <form onsubmit="saveSettings(event)">
-      <!-- General Settings Group -->
-      <fieldset class="border p-3 rounded mb-4">
-        <legend class="w-auto px-2" data-i18n="settings.general">General Settings</legend>
-        <!-- Language Selection -->
-        <div class="mb-3">
-          <label for="languageSelect" class="form-label" data-i18n="settings.language">Language</label>
-          <select id="languageSelect" class="form-select">
-            <option value="en">English</option>
-            <option value="de">Deutsch</option>
-            <option value="es">Español</option>
-            <option value="fr">Français</option>
-            <option value="it">Italiano</option>
-            <option value="de_ch">Schwiizerdütsch</option>
-          </select>
-        </div>
-        <!-- Fail2Ban UI Port (server) -->
-        <div class="mb-3">
-          <label for="uiPort" class="form-label" data-i18n="settings.server_port">Server Port</label>
-          <input type="number" class="form-control" id="uiPort"
-                 data-i18n-placeholder="settings.server_port_placeholder" placeholder="e.g., 8080" required min="80" max="65535" required />
-        </div>
-        <!-- Debug Log Output -->
-        <div class="mb-3 form-check">
-          <input type="checkbox" class="form-check-input" id="debugMode">
-          <label for="debugMode" class="form-check-label" data-i18n="settings.enable_debug">Enable Debug Log</label>
-        </div>
-      </fieldset>
-
-      <!-- Alert Settings Group -->
-      <fieldset class="border p-3 rounded mb-4">
-        <legend class="w-auto px-2" data-i18n="settings.alert">Alert Settings</legend>
-        <div class="mb-3">
-          <label for="destEmail" class="form-label" data-i18n="settings.destination_email">Destination Email (Alerts Receiver)</label>
-          <input type="email" class="form-control" id="destEmail" 
-                 data-i18n-placeholder="settings.destination_email_placeholder" placeholder="alerts@swissmakers.ch" />
-        </div>
-        <div class="mb-3">
-          <label for="alertCountries" class="form-label" data-i18n="settings.alert_countries">Alert Countries</label>
-          <p class="text-muted" data-i18n="settings.alert_countries_description">
-            Choose the countries for which you want to receive email alerts when a block is triggered.
-          </p>
-          <select id="alertCountries" class="form-select" multiple>
-            <option value="ALL">ALL (Every Country)</option>
-            <option value="AF">Afghanistan (AF)</option>
-            <option value="AL">Albania (AL)</option>
-            <option value="DZ">Algeria (DZ)</option>
-            <option value="AD">Andorra (AD)</option>
-            <option value="AO">Angola (AO)</option>
-            <option value="AG">Antigua and Barbuda (AG)</option>
-            <option value="AR">Argentina (AR)</option>
-            <option value="AM">Armenia (AM)</option>
-            <option value="AU">Australia (AU)</option>
-            <option value="AT">Austria (AT)</option>
-            <option value="AZ">Azerbaijan (AZ)</option>
-            <option value="BS">Bahamas (BS)</option>
-            <option value="BH">Bahrain (BH)</option>
-            <option value="BD">Bangladesh (BD)</option>
-            <option value="BB">Barbados (BB)</option>
-            <option value="BY">Belarus (BY)</option>
-            <option value="BE">Belgium (BE)</option>
-            <option value="BZ">Belize (BZ)</option>
-            <option value="BJ">Benin (BJ)</option>
-            <option value="BT">Bhutan (BT)</option>
-            <option value="BO">Bolivia (BO)</option>
-            <option value="BA">Bosnia and Herzegovina (BA)</option>
-            <option value="BW">Botswana (BW)</option>
-            <option value="BR">Brazil (BR)</option>
-            <option value="BN">Brunei (BN)</option>
-            <option value="BG">Bulgaria (BG)</option>
-            <option value="BF">Burkina Faso (BF)</option>
-            <option value="BI">Burundi (BI)</option>
-            <option value="CV">Cabo Verde (CV)</option>
-            <option value="KH">Cambodia (KH)</option>
-            <option value="CM">Cameroon (CM)</option>
-            <option value="CA">Canada (CA)</option>
-            <option value="CF">Central African Republic (CF)</option>
-            <option value="TD">Chad (TD)</option>
-            <option value="CL">Chile (CL)</option>
-            <option value="CN">China (CN)</option>
-            <option value="CO">Colombia (CO)</option>
-            <option value="KM">Comoros (KM)</option>
-            <option value="CG">Congo - Brazzaville (CG)</option>
-            <option value="CD">Congo - Kinshasa (CD)</option>
-            <option value="CR">Costa Rica (CR)</option>
-            <option value="CI">Côte d'Ivoire (CI)</option>
-            <option value="HR">Croatia (HR)</option>
-            <option value="CU">Cuba (CU)</option>
-            <option value="CY">Cyprus (CY)</option>
-            <option value="CZ">Czechia (CZ)</option>
-            <option value="DK">Denmark (DK)</option>
-            <option value="DJ">Djibouti (DJ)</option>
-            <option value="DM">Dominica (DM)</option>
-            <option value="DO">Dominican Republic (DO)</option>
-            <option value="EC">Ecuador (EC)</option>
-            <option value="EG">Egypt (EG)</option>
-            <option value="SV">El Salvador (SV)</option>
-            <option value="GQ">Equatorial Guinea (GQ)</option>
-            <option value="ER">Eritrea (ER)</option>
-            <option value="EE">Estonia (EE)</option>
-            <option value="SZ">Eswatini (SZ)</option>
-            <option value="ET">Ethiopia (ET)</option>
-            <option value="FJ">Fiji (FJ)</option>
-            <option value="FI">Finland (FI)</option>
-            <option value="FR">France (FR)</option>
-            <option value="GA">Gabon (GA)</option>
-            <option value="GM">Gambia (GM)</option>
-            <option value="GE">Georgia (GE)</option>
-            <option value="DE">Germany (DE)</option>
-            <option value="GH">Ghana (GH)</option>
-            <option value="GR">Greece (GR)</option>
-            <option value="GD">Grenada (GD)</option>
-            <option value="GT">Guatemala (GT)</option>
-            <option value="GN">Guinea (GN)</option>
-            <option value="GW">Guinea-Bissau (GW)</option>
-            <option value="GY">Guyana (GY)</option>
-            <option value="HT">Haiti (HT)</option>
-            <option value="HN">Honduras (HN)</option>
-            <option value="HU">Hungary (HU)</option>
-            <option value="IS">Iceland (IS)</option>
-            <option value="IN">India (IN)</option>
-            <option value="ID">Indonesia (ID)</option>
-            <option value="IR">Iran (IR)</option>
-            <option value="IQ">Iraq (IQ)</option>
-            <option value="IE">Ireland (IE)</option>
-            <option value="IL">Israel (IL)</option>
-            <option value="IT">Italy (IT)</option>
-            <option value="JM">Jamaica (JM)</option>
-            <option value="JP">Japan (JP)</option>
-            <option value="JO">Jordan (JO)</option>
-            <option value="KZ">Kazakhstan (KZ)</option>
-            <option value="KE">Kenya (KE)</option>
-            <option value="KI">Kiribati (KI)</option>
-            <option value="KP">North Korea (KP)</option>
-            <option value="KR">South Korea (KR)</option>
-            <option value="KW">Kuwait (KW)</option>
-            <option value="KG">Kyrgyzstan (KG)</option>
-            <option value="LA">Laos (LA)</option>
-            <option value="LV">Latvia (LV)</option>
-            <option value="LB">Lebanon (LB)</option>
-            <option value="LS">Lesotho (LS)</option>
-            <option value="LR">Liberia (LR)</option>
-            <option value="LY">Libya (LY)</option>
-            <option value="LI">Liechtenstein (LI)</option>
-            <option value="LT">Lithuania (LT)</option>
-            <option value="LU">Luxembourg (LU)</option>
-            <option value="MG">Madagascar (MG)</option>
-            <option value="MW">Malawi (MW)</option>
-            <option value="MY">Malaysia (MY)</option>
-            <option value="MV">Maldives (MV)</option>
-            <option value="ML">Mali (ML)</option>
-            <option value="MT">Malta (MT)</option>
-            <option value="MH">Marshall Islands (MH)</option>
-            <option value="MR">Mauritania (MR)</option>
-            <option value="MU">Mauritius (MU)</option>
-            <option value="MX">Mexico (MX)</option>
-            <option value="FM">Micronesia (FM)</option>
-            <option value="LOTR">Middle-earth (LOTR)</option>
-            <option value="MD">Moldova (MD)</option>
-            <option value="MC">Monaco (MC)</option>
-            <option value="MN">Mongolia (MN)</option>
-            <option value="ME">Montenegro (ME)</option>
-            <option value="MA">Morocco (MA)</option>
-            <option value="MZ">Mozambique (MZ)</option>
-            <option value="MM">Myanmar (MM)</option>
-            <option value="NA">Namibia (NA)</option>
-            <option value="NR">Nauru (NR)</option>
-            <option value="NP">Nepal (NP)</option>
-            <option value="NL">Netherlands (NL)</option>
-            <option value="NZ">New Zealand (NZ)</option>
-            <option value="NI">Nicaragua (NI)</option>
-            <option value="NE">Niger (NE)</option>
-            <option value="NG">Nigeria (NG)</option>
-            <option value="NO">Norway (NO)</option>
-            <option value="OM">Oman (OM)</option>
-            <option value="PK">Pakistan (PK)</option>
-            <option value="PW">Palau (PW)</option>
-            <option value="PS">Palestine (PS)</option>
-            <option value="PA">Panama (PA)</option>
-            <option value="PG">Papua New Guinea (PG)</option>
-            <option value="PY">Paraguay (PY)</option>
-            <option value="PE">Peru (PE)</option>
-            <option value="PH">Philippines (PH)</option>
-            <option value="PL">Poland (PL)</option>
-            <option value="PT">Portugal (PT)</option>
-            <option value="QA">Qatar (QA)</option>
-            <option value="RO">Romania (RO)</option>
-            <option value="RU">Russia (RU)</option>
-            <option value="RW">Rwanda (RW)</option>
-            <option value="KN">Saint Kitts and Nevis (KN)</option>
-            <option value="LC">Saint Lucia (LC)</option>
-            <option value="VC">Saint Vincent and the Grenadines (VC)</option>
-            <option value="WS">Samoa (WS)</option>
-            <option value="SM">San Marino (SM)</option>
-            <option value="ST">Sao Tome and Principe (ST)</option>
-            <option value="SA">Saudi Arabia (SA)</option>
-            <option value="SN">Senegal (SN)</option>
-            <option value="RS">Serbia (RS)</option>
-            <option value="SC">Seychelles (SC)</option>
-            <option value="SL">Sierra Leone (SL)</option>
-            <option value="SG">Singapore (SG)</option>
-            <option value="SK">Slovakia (SK)</option>
-            <option value="SI">Slovenia (SI)</option>
-            <option value="SB">Solomon Islands (SB)</option>
-            <option value="SO">Somalia (SO)</option>
-            <option value="ZA">South Africa (ZA)</option>
-            <option value="SS">South Sudan (SS)</option>
-            <option value="ES">Spain (ES)</option>
-            <option value="LK">Sri Lanka (LK)</option>
-            <option value="SD">Sudan (SD)</option>
-            <option value="SR">Suriname (SR)</option>
-            <option value="SE">Sweden (SE)</option>
-            <option value="CH">Switzerland (CH)</option>
-            <option value="SY">Syria (SY)</option>
-            <option value="TW">Taiwan (TW)</option>
-            <option value="TJ">Tajikistan (TJ)</option>
-            <option value="TZ">Tanzania (TZ)</option>
-            <option value="TH">Thailand (TH)</option>
-            <option value="TL">Timor-Leste (TL)</option>
-            <option value="TG">Togo (TG)</option>
-            <option value="TO">Tonga (TO)</option>
-            <option value="TT">Trinidad and Tobago (TT)</option>
-            <option value="TN">Tunisia (TN)</option>
-            <option value="TR">Turkey (TR)</option>
-            <option value="TM">Turkmenistan (TM)</option>
-            <option value="TV">Tuvalu (TV)</option>
-            <option value="UG">Uganda (UG)</option>
-            <option value="UA">Ukraine (UA)</option>
-            <option value="AE">United Arab Emirates (AE)</option>
-            <option value="GB">United Kingdom (GB)</option>
-            <option value="US">United States (US)</option>
-            <option value="UY">Uruguay (UY)</option>
-            <option value="UZ">Uzbekistan (UZ)</option>
-            <option value="VU">Vanuatu (VU)</option>
-            <option value="VE">Venezuela (VE)</option>
-            <option value="VN">Vietnam (VN)</option>
-            <option value="YE">Yemen (YE)</option>
-            <option value="ZM">Zambia (ZM)</option>
-            <option value="ZW">Zimbabwe (ZW)</option>
-          </select>
-        </div>
-      </fieldset>
-
-      <!-- SMTP Configuration Group -->
-      <fieldset class="border p-3 rounded mb-4">
-        <legend class="w-auto px-2" data-i18n="settings.smtp">SMTP Configuration</legend>
-        <div class="mb-3">
-          <label for="smtpHost" class="form-label" data-i18n="settings.smtp_host">SMTP Host</label>
-          <input type="text" class="form-control" id="smtpHost"
-                 data-i18n-placeholder="settings.smtp_host_placeholder" placeholder="e.g., smtp.gmail.com" required />
-        </div>
-        <label for="smtpPort" data-i18n="settings.smtp_port">SMTP Port</label>
-        <select id="smtpPort" class="form-select">
-          <option value="587" selected>587 (Recommended - STARTTLS)</option>
-          <option value="465" disabled>465 (Not Supported)</option>
-        </select>
-        <div class="mb-3">
-          <label for="smtpUsername" class="form-label" data-i18n="settings.smtp_username">SMTP Username</label>
-          <input type="text" class="form-control" id="smtpUsername"
-                 data-i18n-placeholder="settings.smtp_username_placeholder" placeholder="e.g., user@example.com" required />
-        </div>
-        <div class="mb-3">
-          <label for="smtpPassword" class="form-label" data-i18n="settings.smtp_password">SMTP Password</label>
-          <input type="password" class="form-control" id="smtpPassword"
-                 data-i18n-placeholder="settings.smtp_password_placeholder" placeholder="Enter SMTP Password" required />
-        </div>
-        <div class="mb-3">
-          <label for="smtpFrom" class="form-label" data-i18n="settings.smtp_sender">Sender Email</label>
-          <input type="email" class="form-control" id="smtpFrom"
-                 data-i18n-placeholder="settings.smtp_sender_placeholder" placeholder="noreply@swissmakers.ch" required />
-        </div>
-        <div class="mb-3 form-check">
-          <input type="checkbox" class="form-check-input" id="smtpUseTLS">
-          <label for="smtpUseTLS" class="form-check-label" data-i18n="settings.smtp_tls">Use TLS (Recommended)</label>
-        </div>
-        <button type="button" class="btn btn-secondary mt-2" onclick="sendTestEmail()" data-i18n="settings.send_test_email">Send Test Email</button>
-      </fieldset>
-
-      <!-- Fail2Ban Configuration Group -->
-      <fieldset class="border p-3 rounded mb-4">
-        <legend class="w-auto px-2" data-i18n="settings.fail2ban">Fail2Ban Configuration</legend>
-        <!-- Bantime Increment -->
-        <div class="mb-3 form-check">
-          <input type="checkbox" class="form-check-input" id="bantimeIncrement" />
-          <label for="bantimeIncrement" class="form-check-label" data-i18n="settings.enable_bantime_increment">Enable Bantime Increment</label>
-        </div>
-        <!-- Bantime -->
-        <div class="mb-3">
-          <label for="banTime" class="form-label" data-i18n="settings.default_bantime">Default Bantime</label>
-          <input type="text" class="form-control" id="banTime"
-                 data-i18n-placeholder="settings.default_bantime_placeholder" placeholder="e.g., 48h" />
-        </div>
-        <!-- Findtime -->
-        <div class="mb-3">
-          <label for="findTime" class="form-label" data-i18n="settings.default_findtime">Default Findtime</label>
-          <input type="text" class="form-control" id="findTime"
-                 data-i18n-placeholder="settings.default_findtime_placeholder" placeholder="e.g., 30m" />
-        </div>
-        <!-- Max Retry -->
-        <div class="mb-3">
-          <label for="maxRetry" class="form-label" data-i18n="settings.default_max_retry">Default Max Retry</label>
-          <input type="number" class="form-control" id="maxRetry"
-                 data-i18n-placeholder="settings.default_max_retry_placeholder" placeholder="Enter maximum retries" />
-        </div>
-        <!-- Ignore IPs -->
-        <div class="mb-3">
-          <label for="ignoreIP" class="form-label" data-i18n="settings.ignore_ips">Ignore IPs</label>
-          <textarea class="form-control" id="ignoreIP" rows="2"
-                    data-i18n-placeholder="settings.ignore_ips_placeholder" placeholder="IPs to ignore, separated by spaces"></textarea>
-        </div>
-      </fieldset>
-      <button type="submit" class="btn btn-primary" data-i18n="settings.save">Save</button>
-    </form>
-  </div>
-  <!-- ******************************************************************* -->
+  </main>
 
   <!-- Footer -->
-  <footer class="text-center mt-4 mb-4">
-    <p class="mb-0">
-      &copy; <a href="https://swissmakers.ch" target="_blank">Swissmakers GmbH</a>
-      -
-      <a href="https://github.com/swissmakers/fail2ban-ui" target="_blank">GitHub</a>
-    </p>
+  <footer class="bg-gray-100 py-4">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-600 text-sm">
+      <p class="mb-0">
+        &copy; <a href="https://swissmakers.ch" target="_blank" class="text-blue-600 hover:text-blue-800">Swissmakers GmbH</a>
+        -
+        <a href="https://github.com/swissmakers/fail2ban-ui" target="_blank" class="text-blue-600 hover:text-blue-800">GitHub</a>
+      </p>
+    </div>
   </footer>
 
-  <!-- ******************************************************************* -->
-  <!--                       APP Components (HTML) :                       -->
-  <!-- ******************************************************************* -->
-  <!-- Loading Overlay -->
-  <div id="loading-overlay" class="d-flex">
-    <div class="spinner-border text-light" role="status">
-      <span class="visually-hidden" data-i18n="loading">Loading...</span>
-    </div>
-  </div>
-
   <!-- Jail Config Modal -->
-  <div class="modal fade" id="jailConfigModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">
-            <span data-i18n="modal.filter_config">Filter Config:</span> <span id="modalJailName"></span>
-          </h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <div id="jailConfigModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+      <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+        <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+      </div>
+      
+      <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+      
+      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div class="sm:flex sm:items-start">
+            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">
+                <span data-i18n="modal.filter_config">Filter Config:</span> <span id="modalJailName"></span>
+              </h3>
+              <div class="mt-4">
+                <textarea id="jailConfigTextarea" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 h-96 font-mono text-sm"></textarea>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="modal-body">
-          <textarea id="jailConfigTextarea" class="form-control" rows="15"></textarea>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="modal.cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" onclick="saveJailConfig()" data-i18n="modal.save">Save</button>
+        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+          <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" onclick="saveJailConfig()" data-i18n="modal.save">Save</button>
+          <button type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm" onclick="closeModal('jailConfigModal')" data-i18n="modal.cancel">Cancel</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Manage Jails Modal -->
-  <div class="modal fade" id="manageJailsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" data-i18n="modal.manage_jails_title">Manage Jails</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <div id="manageJailsModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+      <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+        <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+      </div>
+      
+      <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+      
+      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div class="sm:flex sm:items-start">
+            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+              <h3 class="text-lg leading-6 font-medium text-gray-900" data-i18n="modal.manage_jails_title">Manage Jails</h3>
+              <div class="mt-4">
+                <!-- Dynamically filled list of jails with toggle switches -->
+                <div id="jailsList" class="divide-y divide-gray-200"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="modal-body">
-          <!-- Dynamically filled list of jails with toggle switches -->
-          <div id="jailsList"></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="modal.cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" onclick="saveManageJails()" data-i18n="modal.save">Save Changes</button>
+        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+          <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" onclick="saveManageJails()" data-i18n="modal.save">Save Changes</button>
+          <button type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm" onclick="closeModal('manageJailsModal')" data-i18n="modal.cancel">Cancel</button>
         </div>
       </div>
     </div>
   </div>
-  <!-- ******************************************************************* -->
 
-  <!-- Bootstrap 5 JS (for modal, etc.) -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
   <!-- jQuery (used by Select2) -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <!-- Select2 JS -->
@@ -585,11 +695,29 @@
         });
     }
 
-    // Function to initialize Bootstrap tooltips
+    // Function to initialize tooltips
     function initializeTooltips() {
-      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-      tooltipTriggerList.forEach(function (tooltipTriggerEl) {
-        new bootstrap.Tooltip(tooltipTriggerEl);
+      const tooltips = document.querySelectorAll('[data-tooltip]');
+      tooltips.forEach(el => {
+        el.addEventListener('mouseenter', () => {
+          const tooltip = document.createElement('div');
+          tooltip.className = 'absolute z-10 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap';
+          tooltip.textContent = el.getAttribute('data-tooltip');
+          tooltip.style.top = (el.offsetTop - 30) + 'px';
+          tooltip.style.left = (el.offsetLeft + (el.offsetWidth / 2) - (tooltip.offsetWidth / 2)) + 'px';
+          tooltip.id = 'tooltip-' + Date.now();
+          document.body.appendChild(tooltip);
+          el.setAttribute('data-tooltip-id', tooltip.id);
+        });
+        
+        el.addEventListener('mouseleave', () => {
+          const tooltipId = el.getAttribute('data-tooltip-id');
+          if (tooltipId) {
+            const tooltip = document.getElementById(tooltipId);
+            if (tooltip) tooltip.remove();
+            el.removeAttribute('data-tooltip-id');
+          }
+        });
       });
     }
 
@@ -623,12 +751,12 @@
     // Load dynamically the other pages when navigating in nav
     function showSection(sectionId) {
       // hide all sections
-      document.getElementById('dashboardSection').style.display = 'none';
-      document.getElementById('filterSection').style.display = 'none';
-      document.getElementById('settingsSection').style.display = 'none';
+      document.getElementById('dashboardSection').classList.add('hidden');
+      document.getElementById('filterSection').classList.add('hidden');
+      document.getElementById('settingsSection').classList.add('hidden');
 
       // show the requested section
-      document.getElementById(sectionId).style.display = 'block';
+      document.getElementById(sectionId).classList.remove('hidden');
 
       // If it's filterSection, load filters
       if (sectionId === 'filterSection') {
@@ -640,11 +768,23 @@
       }
 
       // Close navbar on mobile when clicking a menu item
-      let navbar = document.getElementById('navbarSupportedContent');
-      if (navbar.classList.contains('show')) {
-        let navbarToggler = document.querySelector('.navbar-toggler');
-        navbarToggler.click();
-      }
+      document.getElementById('mobileMenu').classList.add('hidden');
+    }
+
+    // Toggle mobile menu
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      menu.classList.toggle('hidden');
+    }
+
+    // Close modal
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+    }
+
+    // Open modal
+    function openModal(modalId) {
+      document.getElementById(modalId).classList.remove('hidden');
     }
 
     //*******************************************************************
@@ -658,119 +798,160 @@
         .then(function(data) {
           if (data.error) {
             document.getElementById('dashboard').innerHTML =
-              '<div class="alert alert-danger">' + data.error + '</div>';
+              '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">' + data.error + '</div>';
             return;
           }
           renderDashboard(data);
         })
         .catch(function(err) {
           document.getElementById('dashboard').innerHTML =
-            '<div class="alert alert-danger">Error: ' + err + '</div>';
+            '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">Error: ' + err + '</div>';
         });
     }
 
     // Render the main dashboard
     function renderDashboard(data) {
-      var html = "";
+
+      var html = `
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow p-4">
+          <p class="text-sm text-gray-500">Active Jails</p>
+          <p class="text-2xl font-semibold text-gray-800">${data.jails.length}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+          <p class="text-sm text-gray-500">Total Banned IPs</p>
+          <p class="text-2xl font-semibold text-gray-800">
+            ${data.jails.reduce((sum, j) => sum + j.totalBanned, 0)}
+          </p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+          <p class="text-sm text-gray-500">New Last Hour</p>
+          <p class="text-2xl font-semibold text-gray-800">
+            ${data.jails.reduce((sum, j) => sum + j.newInLastHour, 0)}
+          </p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+          <p class="text-sm text-gray-500">Recent Bans</p>
+          <p class="text-2xl font-semibold text-gray-800">${data.lastBans.length}</p>
+        </div>
+      </div>
+      `;
 
       // Add a search bar
       html += `
-      <fieldset class="border p-3 rounded mb-4">
-          <legend class="w-auto px-2"><span data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="The Overview displays the currently enabled jails that you have added to your jail.local configuration." data-i18n="dashboard.overview">Overview active Jails and Blocks</span></legend>
-      <div class="mb-3">
-        <label for="ipSearch" class="form-label" data-i18n="dashboard.search_label">Search Banned IPs</label>
-        <input type="text" id="ipSearch" class="form-control" placeholder="Enter IP address to search" data-i18n-placeholder="dashboard.search_placeholder" onkeyup="filterIPs()" pattern="[0-9.]*">
-      </div>
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">
+          <span data-tooltip="The Overview displays the currently enabled jails that you have added to your jail.local configuration." data-i18n="dashboard.overview">Overview active Jails and Blocks</span>
+        </h3>
+        <div class="mb-4">
+          <label for="ipSearch" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="dashboard.search_label">Search Banned IPs</label>
+          <input type="text" id="ipSearch" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter IP address to search" data-i18n-placeholder="dashboard.search_placeholder" onkeyup="filterIPs()" pattern="[0-9.]*">
+        </div>
       `;
 
       // Jails table
       if (!data.jails || data.jails.length === 0) {
-        html += '<p data-i18n="dashboard.no_jails">No jails found.</p>';
+        html += '<p class="text-gray-500" data-i18n="dashboard.no_jails">No jails found.</p>';
       } else {
         html += ''
-          + '<div class="table-responsive">'
-          + '<table class="table table-striped" id="jailsTable">'
-          + '  <thead>'
-          + '    <tr>'
-          + '      <th data-i18n="dashboard.table.jail_name">Jail Name</th>'
-          + '      <th data-i18n="dashboard.table.total_banned">Total Banned</th>'
-          + '      <th data-i18n="dashboard.table.new_last_hour">New Last Hour</th>'
-          + '      <th data-i18n="dashboard.table.banned_ips">Banned IPs (Unban)</th>'
-          + '    </tr>'
+          + '<div class="overflow-x-auto">'
+          +   '<table class="min-w-full divide-y divide-gray-200 text-sm sm:text-base" id="jailsTable">'
+          +     '<thead class="bg-gray-50">'
+          +       '<tr>'
+          +         '<th class="px-2 py-1 sm:px-6 sm:py-3 whitespace-normal break-words text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jail Name</th>'
+          +         '<th class="hidden sm:table-cell px-2 py-1 sm:px-6 sm:py-3 whitespace-normal break-words text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Banned</th>'
+          +         '<th class="hidden sm:table-cell px-2 py-1 sm:px-6 sm:py-3 whitespace-normal break-words text-left text-xs font-medium text-gray-500 uppercase tracking-wider">New Last Hour</th>'
+          +         '<th class="px-2 py-1 sm:px-6 sm:py-3 whitespace-normal break-words text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banned IPs</th>'
+          +       '</tr>'
           + '  </thead>'
-          + '  <tbody>';
+          + '  <tbody class="bg-white divide-y divide-gray-200">';
 
         data.jails.forEach(function(jail) {
           var bannedHTML = renderBannedIPs(jail.jailName, jail.bannedIPs);
           html += ''
-            + '<tr class="jail-row">'
-            + '  <td>'
-            + '    <a href="#" onclick="openJailConfigModal(\'' + jail.jailName + '\')">'
+            + '<tr class="jail-row hover:bg-gray-50">'
+            + '  <td class="px-2 py-1 sm:px-6 sm:py-4 whitespace-normal break-words">'
+            + '    <a href="#" onclick="openJailConfigModal(\'' + jail.jailName + '\')" class="text-blue-600 hover:text-blue-800">'
             +        jail.jailName
             + '    </a>'
             + '  </td>'
-            + '  <td>' + jail.totalBanned + '</td>'
-            + '  <td>' + jail.newInLastHour + '</td>'
-            + '  <td>' + bannedHTML + '</td>'
+            + '  <td class="hidden sm:table-cell px-2 py-1 sm:px-6 sm:py-4 whitespace-normal break-words">' + jail.totalBanned + '</td>'
+            + '  <td class="hidden sm:table-cell px-2 py-1 sm:px-6 sm:py-4 whitespace-normal break-words">' + jail.newInLastHour + '</td>'
+            + '  <td class="px-2 py-1 sm:px-6 sm:py-4 whitespace-normal break-words">' + bannedHTML + '</td>'
             + '</tr>';
         });
 
         html += '</tbody></table>';
-        html += '</div></fieldset>';
+        html += '</div></div>';
       }
 
       // Last 5 bans
-      html += '<fieldset class="border p-3 rounded mb-4">';
-      html += '  <legend class="w-auto px-2" data-i18n="dashboard.last_bans">Last 5 Ban Events</legend>';
+      html += '<div class="bg-white rounded-lg shadow p-6">';
+      html += '  <h3 class="text-lg font-medium text-gray-900 mb-4" data-i18n="dashboard.last_bans">Last 5 Ban Events</h3>';
       if (!data.lastBans || data.lastBans.length === 0) {
-        html += '<p data-i18n="dashboard.no_recent_bans">No recent bans found.</p>';
+        html += '<p class="text-gray-500" data-i18n="dashboard.no_recent_bans">No recent bans found.</p>';
       } else {
         html += ''
-          + '<div class="table-responsive">'
-          + '<table class="table table-bordered">'
-          + '  <thead>'
+          + '<div class="overflow-x-auto">'
+          + '<table class="min-w-full divide-y divide-gray-200 text-sm sm:text-base">'
+          + '  <thead class="bg-gray-50">'
           + '    <tr>'
-          + '      <th data-i18n="dashboard.table.time">Time</th>'
-          + '      <th data-i18n="dashboard.table.jail">Jail</th>'
-          + '      <th data-i18n="dashboard.table.ip">IP</th>'
-          + '      <th data-i18n="dashboard.table.log_line">Log Line</th>'
+          + '      <th scope="col" class="px-2 py-1 sm:px-6 sm:py-3 whitespace-normal break-words text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-i18n="dashboard.table.time">Time</th>'
+          + '      <th scope="col" class="hidden sm:table-cell px-2 py-1 sm:px-6 sm:py-3 whitespace-normal break-words text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-i18n="dashboard.table.jail">Jail</th>'
+          + '      <th scope="col" class="hidden sm:table-cell px-2 py-1 sm:px-6 sm:py-3 whitespace-normal break-words text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-i18n="dashboard.table.ip">IP</th>'
+          + '      <th scope="col" class="px-2 py-1 sm:px-6 sm:py-3 whitespace-normal break-words text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-i18n="dashboard.table.log_line">Log Line</th>'
           + '    </tr>'
           + '  </thead>'
-          + '  <tbody></div>';
+          + '  <tbody class="bg-white divide-y divide-gray-200">';
 
         data.lastBans.forEach(function(e) {
           html += ''
-            + '<tr>'
-            + '  <td>' + e.Time + '</td>'
-            + '  <td>' + e.Jail + '</td>'
-            + '  <td>' + e.IP + '</td>'
-            + '  <td>' + e.LogLine + '</td>'
+            + '<tr class="hover:bg-gray-50">'
+            + '  <td class="px-2 py-1 sm:px-6 sm:py-4 whitespace-normal break-words">' + e.Time + '</td>'
+            + '  <td class="hidden sm:table-cell px-2 py-1 sm:px-6 sm:py-4 whitespace-normal break-words">' + e.Jail + '</td>'
+            + '  <td class="hidden sm:table-cell px-2 py-1 sm:px-6 sm:py-4 whitespace-normal break-words">' + e.IP + '</td>'
+            + '  <td class="px-2 py-1 sm:px-6 sm:py-4 whitespace-normal break-words">' + e.LogLine + '</td>'
             + '</tr>';
         });
 
-        html += '</tbody></table></fieldset>';
+        html += '</tbody></table></div>';
       }
+      html += '</div>';
 
       document.getElementById('dashboard').innerHTML = html;
+
+      const extIpEl = document.getElementById('external-ip');
+      if (extIpEl) {
+        extIpEl.addEventListener('click', () => {
+          const ip = extIpEl.textContent.trim();
+          const searchInput = document.getElementById('ipSearch');
+          if (searchInput) {
+            searchInput.value = ip;
+            filterIPs();
+            searchInput.focus();
+            searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        });
+      }
     }
 
     // Render banned IPs with "Unban" button
     function renderBannedIPs(jailName, ips) {
       if (!ips || ips.length === 0) {
-        return '<em data-i18n="dashboard.no_banned_ips">No banned IPs</em>';
+        return '<em class="text-gray-500" data-i18n="dashboard.no_banned_ips">No banned IPs</em>';
       }
-      var content = '<ul class="list-unstyled mb-0">';
+      var content = '<div class="space-y-2">';
       ips.forEach(function(ip) {
         content += ''
-          + '<li class="d-flex align-items-center mb-1">'
-          + '  <span class="me-auto">' + ip + '</span>'
-          + '  <button class="btn btn-sm btn-warning"'
+          + '<div class="flex items-center justify-between">'
+          + '  <span class="text-sm">' + ip + '</span>'
+          + '  <button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"'
           + '    onclick="unbanIP(\'' + jailName + '\', \'' + ip + '\')">'
           + '    <span data-i18n="dashboard.unban">Unban</span>'
           + '  </button>'
-          + '</li>';
+          + '</div>';
       });
-      content += '</ul>';
+      content += '</div>';
       return content;
     }
 
@@ -781,16 +962,14 @@
 
       // Process each row in the jails table
       document.querySelectorAll("#jailsTable .jail-row").forEach(row => {
-        // Get all list items (each representing an IP entry)
-        const ipItems = row.querySelectorAll("ul li");
+        const ipItems = row.querySelectorAll("div.flex");
         let rowHasMatch = false;
 
         ipItems.forEach(li => {
-          // Find the span that contains the IP text.
-          const span = li.querySelector("span.me-auto");
+          const span = li.querySelector("span.text-sm");
           if (!span) return;
 
-          // Retrieve the original IP text from a data attribute; if not set, save it.
+          // stash original if needed
           let originalIP = span.getAttribute("data-original");
           if (!originalIP) {
             originalIP = span.textContent.trim();
@@ -806,15 +985,14 @@
             // If the IP contains the query, show the item and highlight the matching text.
             li.style.display = "";
             const regex = new RegExp(query, "gi");
-            span.innerHTML = originalIP.replace(regex, (match) => `<mark>${match}</mark>`);
+            span.innerHTML = originalIP.replace(regex, m => `<mark>${m}</mark>`);
             rowHasMatch = true;
           } else {
-            // Hide the IP item if it does not match.
-            li.style.setProperty("display", "none", "important");
+            li.style.display = "none";
           }
         });
 
-        // If none of the IP items in the row match the query, hide the entire row.
+        // hide the whole row if nothing matched
         row.style.display = rowHasMatch ? "" : "none";
       });
     }
@@ -865,9 +1043,7 @@
             alert("Error loading config: " + data.error);
           } else {
             textArea.value = data.config;
-            var modalEl = document.getElementById('jailConfigModal');
-            var myModal = new bootstrap.Modal(modalEl);
-            myModal.show();
+            openModal('jailConfigModal');
           }
         })
         .catch(function(err) {
@@ -894,9 +1070,7 @@
             alert("Error saving config: " + data.error);
           } else {
             console.log("Filter saved successfully. Restart needed? " + data.restartNeeded);
-            var modalEl = document.getElementById('jailConfigModal');
-            var modalObj = bootstrap.Modal.getInstance(modalEl);
-            modalObj.hide();
+            closeModal('jailConfigModal');
             document.getElementById('restartBanner').style.display = 'block';
           }
         })
@@ -913,35 +1087,50 @@
     function openManageJailsModal() {
       showLoading(true);
       fetch('/api/jails/manage')
-        .then(function(res) { return res.json(); })
-        .then(function(data) {
-          if (!data.jails || data.jails.length === 0) {
+        .then(res => res.json())
+        .then(data => {
+          if (!data.jails?.length) {
             alert("No jails found.");
-            showLoading(false);
             return;
           }
-          var html = '<div class="list-group">';
-          data.jails.forEach(function(jail) {
-            var isEnabled = (jail.enabled === true);
-            html += '<div class="list-group-item d-flex justify-content-between align-items-center">';
-            html += '<span>' + jail.jailName + '</span>';
-            html += '<div class="form-check form-switch">';
-            html += '<input class="form-check-input" type="checkbox" id="toggle-' + jail.jailName + '" ' + (isEnabled ? 'checked' : '') + '>';
-            html += '</div>';
-            html += '</div>';
-          });
-          html += '</div>';
+
+          const html = data.jails.map(jail => {
+            const isEnabled = jail.enabled ? 'checked' : '';
+            return `
+              <div class="flex items-center justify-between p-3 bg-gray-50">
+                <span class="text-sm font-medium">${jail.jailName}</span>
+
+                <!-- slider -->
+                <label class="inline-flex relative items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="toggle-${jail.jailName}"
+                    class="sr-only peer"
+                    ${isEnabled}
+                  />
+
+                  <!-- track -->
+                  <div
+                    class="w-11 h-6 bg-gray-200 rounded-full
+                          peer-focus:ring-4 peer-focus:ring-blue-300
+                          peer-checked:bg-blue-600 transition-colors"
+                  ></div>
+
+                  <!-- thumb -->
+                  <span
+                    class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full
+                          transition-transform peer-checked:translate-x-5"
+                  ></span>
+                </label>
+              </div>
+            `;
+          }).join('');
+
           document.getElementById('jailsList').innerHTML = html;
-          var modalEl = document.getElementById('manageJailsModal');
-          var manageJailsModal = new bootstrap.Modal(modalEl);
-          manageJailsModal.show();
+          openModal('manageJailsModal');
         })
-        .catch(function(err) {
-          alert("Error fetching jails: " + err);
-        })
-        .finally(function() {
-          showLoading(false);
-        });
+        .catch(err => alert("Error fetching jails: " + err))
+        .finally(() => showLoading(false));
     }
 
     // Function: saveManageJails
@@ -949,11 +1138,12 @@
     function saveManageJails() {
       showLoading(true);
       var updatedJails = {};
-      $('.list-group-item').each(function() {
-        var jailName = $(this).find('span').text();
-        var isEnabled = $(this).find('input[type="checkbox"]').is(':checked');
+      document.querySelectorAll('#jailsList > div').forEach(function(item) {
+        var jailName = item.querySelector('span').textContent;
+        var isEnabled = item.querySelector('input[type="checkbox"]').checked;
         updatedJails[jailName] = isEnabled;
       });
+
       // Send updated states to the API endpoint /api/jails/manage.
       fetch('/api/jails/manage', {
         method: 'POST',
@@ -974,11 +1164,7 @@
         })
         .finally(function() {
           showLoading(false);
-          var modalEl = document.getElementById('manageJailsModal');
-          var manageJailsModal = bootstrap.Modal.getInstance(modalEl);
-          if (manageJailsModal) {
-            manageJailsModal.hide();
-          }
+          closeModal('manageJailsModal');
         });
     }
 
@@ -1177,9 +1363,9 @@
     }
 
     function renderTestResults(matches) {
-      let html = '<h5 data-i18n="filter_debug.test_results_title">Test Results</h5>';
+      let html = '<h5 class="text-lg font-medium text-gray-900 mb-4" data-i18n="filter_debug.test_results_title">Test Results</h5>';
       if (!matches || matches.length === 0) {
-        html += '<p data-i18n="filter_debug.no_matches">No matches found.</p>';
+        html += '<p class="text-gray-500" data-i18n="filter_debug.no_matches">No matches found.</p>';
       } else {
         html += '<ul>';
         matches.forEach(m => {
