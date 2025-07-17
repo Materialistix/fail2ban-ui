@@ -39,7 +39,17 @@
       z-index: 9999; /* on top */
       align-items: center;
       justify-content: center;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      opacity: 0;
+      transition: opacity 0.4s ease;
     }
+
+    #loading-overlay.show {
+        display: flex;
+        opacity: 1;
+    }
+
     .spinner-border {
       width: 4rem;
       height: 4rem;
@@ -107,9 +117,19 @@
 
   <!-- Dashboard Section -->
   <div id="dashboardSection" class="container my-4">
-    <div class="d-flex align-items-center" style="position: relative;">
+    <div class="d-flex align-items-center">
       <h1 class="mb-4 flex-grow-1" data-i18n="dashboard.title">Dashboard</h1>
-      <button class="btn btn-outline-secondary" style="position: absolute; right: 0; top: 0;" onclick="openManageJailsModal()" data-i18n="dashboard.manage_jails">Manage Jails</button>
+      <div class="d-flex align-items-center" style="align-self: baseline;">
+        <div class="text-secondary small">
+          Your ext. IP: <span id="external-ip">Loading...</span>
+        </div>
+        <button class="btn btn-outline-secondary ms-2"
+          onclick="openManageJailsModal()"
+          data-i18n="dashboard.manage_jails">
+          Manage Jails
+        </button>
+      </div>
+
     </div>
     <div id="dashboard"></div>
   </div>
@@ -527,10 +547,11 @@
     //*******************************************************************
     //*                 Init page and main-components :                 *
     //*******************************************************************
+    showLoading(true);
 
     var currentJailForConfig = null;
     window.addEventListener('DOMContentLoaded', function() {
-      showLoading(true);
+      displayExternalIP();
       checkRestartNeeded();
       fetchSummary().then(function() {
         showLoading(false);
@@ -539,6 +560,30 @@
         getTranslationsSettingsOnPageload();
       });
     });
+
+    // Toggle the loading overlay (with !important)
+    function showLoading(show) {
+      var overlay = document.getElementById('loading-overlay');
+      if (show) {
+        overlay.style.setProperty('display', 'flex', 'important');
+        setTimeout(() => overlay.classList.add('show'), 10);
+      } else {
+        overlay.classList.remove('show');    // Start fade-out
+        setTimeout(() => overlay.style.setProperty('display', 'none', 'important'), 400);
+      }
+    }
+
+    // Fetch and display own external IP for webUI
+    function displayExternalIP() {
+      fetch('https://api.ipify.org?format=json')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('external-ip').textContent = data.ip;
+        })
+        .catch(() => {
+          document.getElementById('external-ip').textContent = 'Unavailable';
+        });
+    }
 
     // Function to initialize Bootstrap tooltips
     function initializeTooltips() {
@@ -558,15 +603,6 @@
             event.preventDefault();
           }
         });
-      }
-    }
-    // Toggle the loading overlay (with !important)
-    function showLoading(show) {
-      var overlay = document.getElementById('loading-overlay');
-      if (show) {
-        overlay.style.setProperty('display', 'flex', 'important');
-      } else {
-        overlay.style.setProperty('display', 'none', 'important');
       }
     }
 
