@@ -140,12 +140,23 @@
 </head>
 
 <body class="bg-gray-50 overflow-y-scroll">
+
   <!-- Loading Overlay -->
   <div id="loading-overlay" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50 backdrop-blur-sm">
-  <div class="h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <div class="h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
   </div>
 
-  <!-- Navigation -->
+  <!-- Restart Banner -->
+  <div id="restartBanner" class="bg-yellow-400 text-gray-900 p-3 text-center">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-center gap-4">
+      <strong data-i18n="restart_banner.message">Fail2ban configuration changed! To apply the changes, please: </strong>
+      <button class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors" onclick="restartFail2ban()" data-i18n="restart_banner.button">Restart Service</button>
+    </div>
+  </div>
+
+  <!-- ******************************************************************* -->
+  <!--                          Navigation START                           -->
+  <!-- ******************************************************************* -->
   <nav class="bg-blue-600 text-white shadow-lg">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
@@ -170,7 +181,6 @@
         </div>
       </div>
     </div>
-    
     <!-- Mobile menu -->
     <div id="mobileMenu" class="hidden md:hidden">
       <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
@@ -180,19 +190,14 @@
       </div>
     </div>
   </nav>
-  <!-- ******************************************************************* -->
+  <!-- ************************ Navigation END *************************** -->
 
-  <!-- Restart Banner -->
-  <div id="restartBanner" class="bg-yellow-400 text-gray-900 p-3 text-center">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-center gap-4">
-      <strong data-i18n="restart_banner.message">Fail2ban configuration changed! To apply the changes, please: </strong>
-      <button class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors" onclick="restartFail2ban()" data-i18n="restart_banner.button">Restart Service</button>
-    </div>
-  </div>
 
   <!-- Main Content -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <!-- Dashboard Section -->
+  <!-- ******************************************************************* -->
+  <!--                        Dashboard Page START                         -->
+  <!-- ******************************************************************* -->
     <div id="dashboardSection">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800 mb-4 md:mb-0" data-i18n="dashboard.title">Dashboard</h1>
@@ -208,42 +213,50 @@
         </div>
       </div>
       
-      <div id="dashboard"></div>
+      <div id="dashboard"></div> <!-- Here is the dynamic content loaded form the API -->
     </div>
+  <!-- ********************** Dashboard Page END ************************* -->
 
-    <!-- Filter Debug Section -->
+
+  <!-- ******************************************************************* -->
+  <!--                       Filter-Debug Page START                       -->
+  <!-- ******************************************************************* -->
     <div id="filterSection" class="hidden">
       <h2 class="text-2xl font-bold text-gray-800 mb-6" data-i18n="filter_debug.title">Filter Debug</h2>
-      
+
       <div class="bg-white rounded-lg shadow p-6 mb-6">
         <!-- Dropdown of available jail/filters -->
         <div class="mb-4">
           <label for="filterSelect" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="filter_debug.select_filter">Select a Filter</label>
           <select id="filterSelect" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
         </div>
-        
+
         <!-- Textarea for log lines to test -->
         <div class="mb-4">
           <label for="logLinesTextarea" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="filter_debug.log_lines">Log Lines</label>
           <textarea id="logLinesTextarea" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 h-40" disabled
                     data-i18n-placeholder="filter_debug.log_lines_placeholder" placeholder="Enter log lines here..."></textarea>
         </div>
-        
+
         <button class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors" onclick="testSelectedFilter()" data-i18n="filter_debug.test_filter">Test Filter</button>
       </div>
-      
+
       <div id="testResults" class="bg-white rounded-lg shadow p-6"></div>
     </div>
+  <!-- ********************* Filter-Debug Page END *********************** -->
 
-    <!-- Settings Section -->
+
+  <!-- ******************************************************************* -->
+  <!--                         Settings Page START                         -->
+  <!-- ******************************************************************* -->
     <div id="settingsSection" class="hidden">
       <h2 class="text-2xl font-bold text-gray-800 mb-6" data-i18n="settings.title">Settings</h2>
-      
+
       <form onsubmit="saveSettings(event)" class="space-y-6">
         <!-- General Settings Group -->
         <div class="bg-white rounded-lg shadow p-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4" data-i18n="settings.general">General Settings</h3>
-          
+
           <!-- Language Selection -->
           <div class="mb-4">
             <label for="languageSelect" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.language">Language</label>
@@ -256,14 +269,14 @@
               <option value="de_ch">Schwiizerdütsch</option>
             </select>
           </div>
-          
+
           <!-- Fail2Ban UI Port (server) -->
           <div class="mb-4">
             <label for="uiPort" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.server_port">Server Port</label>
             <input type="number" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="uiPort"
                    data-i18n-placeholder="settings.server_port_placeholder" placeholder="e.g., 8080" required min="80" max="65535" />
           </div>
-          
+
           <!-- Debug Log Output -->
           <div class="flex items-center">
             <input type="checkbox" id="debugMode" class="h-4 w-7 text-blue-600 transition duration-150 ease-in-out">
@@ -274,13 +287,11 @@
         <!-- Alert Settings Group -->
         <div class="bg-white rounded-lg shadow p-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4" data-i18n="settings.alert">Alert Settings</h3>
-          
           <div class="mb-4">
             <label for="destEmail" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.destination_email">Destination Email (Alerts Receiver)</label>
             <input type="email" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="destEmail"
                    data-i18n-placeholder="settings.destination_email_placeholder" placeholder="alerts@swissmakers.ch" />
           </div>
-          
           <div class="mb-4">
             <label for="alertCountries" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.alert_countries">Alert Countries</label>
             <p class="text-sm text-gray-500 mb-2" data-i18n="settings.alert_countries_description">
@@ -490,13 +501,11 @@
         <!-- SMTP Configuration Group -->
         <div class="bg-white rounded-lg shadow p-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4" data-i18n="settings.smtp">SMTP Configuration</h3>
-          
           <div class="mb-4">
             <label for="smtpHost" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_host">SMTP Host</label>
             <input type="text" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="smtpHost"
                    data-i18n-placeholder="settings.smtp_host_placeholder" placeholder="e.g., smtp.gmail.com" required />
           </div>
-          
           <div class="mb-4">
             <label for="smtpPort" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_port">SMTP Port</label>
             <select id="smtpPort" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -504,64 +513,54 @@
               <option value="465" disabled>465 (Not Supported)</option>
             </select>
           </div>
-          
           <div class="mb-4">
             <label for="smtpUsername" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_username">SMTP Username</label>
             <input type="text" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="smtpUsername"
                    data-i18n-placeholder="settings.smtp_username_placeholder" placeholder="e.g., user@example.com" required />
           </div>
-          
           <div class="mb-4">
             <label for="smtpPassword" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_password">SMTP Password</label>
             <input type="password" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="smtpPassword"
                    data-i18n-placeholder="settings.smtp_password_placeholder" placeholder="Enter SMTP Password" required />
           </div>
-          
           <div class="mb-4">
             <label for="smtpFrom" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.smtp_sender">Sender Email</label>
             <input type="email" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="smtpFrom"
                    data-i18n-placeholder="settings.smtp_sender_placeholder" placeholder="noreply@swissmakers.ch" required />
           </div>
-          
           <div class="flex items-center mb-4">
             <input type="checkbox" id="smtpUseTLS" class="h-4 w-7 text-blue-600 transition duration-150 ease-in-out">
             <label for="smtpUseTLS" class="ml-2 block text-sm text-gray-700" data-i18n="settings.smtp_tls">Use TLS (Recommended)</label>
           </div>
-          
           <button type="button" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors" onclick="sendTestEmail()" data-i18n="settings.send_test_email">Send Test Email</button>
         </div>
 
         <!-- Fail2Ban Configuration Group -->
         <div class="bg-white rounded-lg shadow p-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4" data-i18n="settings.fail2ban">Fail2Ban Configuration</h3>
-          
           <!-- Bantime Increment -->
           <div class="flex items-center mb-4">
             <input type="checkbox" id="bantimeIncrement" class="h-4 w-7 text-blue-600 transition duration-150 ease-in-out" />
             <label for="bantimeIncrement" class="ml-2 block text-sm text-gray-700" data-i18n="settings.enable_bantime_increment">Enable Bantime Increment</label>
           </div>
-          
           <!-- Bantime -->
           <div class="mb-4">
             <label for="banTime" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.default_bantime">Default Bantime</label>
             <input type="text" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="banTime"
                    data-i18n-placeholder="settings.default_bantime_placeholder" placeholder="e.g., 48h" />
           </div>
-          
           <!-- Findtime -->
           <div class="mb-4">
             <label for="findTime" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.default_findtime">Default Findtime</label>
             <input type="text" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="findTime"
                    data-i18n-placeholder="settings.default_findtime_placeholder" placeholder="e.g., 30m" />
           </div>
-          
           <!-- Max Retry -->
           <div class="mb-4">
             <label for="maxRetry" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.default_max_retry">Default Max Retry</label>
             <input type="number" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" id="maxRetry"
                    data-i18n-placeholder="settings.default_max_retry_placeholder" placeholder="Enter maximum retries" />
           </div>
-          
           <!-- Ignore IPs -->
           <div class="mb-4">
             <label for="ignoreIP" class="block text-sm font-medium text-gray-700 mb-2" data-i18n="settings.ignore_ips">Ignore IPs</label>
@@ -569,10 +568,11 @@
                       data-i18n-placeholder="settings.ignore_ips_placeholder" placeholder="IPs to ignore, separated by spaces"></textarea>
           </div>
         </div>
-        
         <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors" data-i18n="settings.save">Save</button>
       </form>
+
     </div>
+  <!-- *********************** Settings Page END ************************* -->
   </main>
 
   <!-- Footer -->
@@ -586,6 +586,10 @@
     </div>
   </footer>
 
+
+  <!-- ******************************************************************* -->
+  <!--                        Modal Templates START                        -->
+  <!-- ******************************************************************* -->
   <!-- Jail Config Modal -->
   <div id="jailConfigModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -644,6 +648,7 @@
       </div>
     </div>
   </div>
+  <!-- ********************** Modal Templates END ************************ -->
 
   <!-- jQuery (used by Select2) -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -654,9 +659,9 @@
     // For information: We avoid ES6 backticks in our JS, to prevent confusion with the Go template parser.
     "use strict";
 
-    //*******************************************************************
-    //*                 Init page and main-components :                 *
-    //*******************************************************************
+    // *******************************************************************
+    // *                 Init page and main-components :                 *
+    // *******************************************************************
     showLoading(true);
 
     var currentJailForConfig = null;
@@ -670,6 +675,12 @@
         getTranslationsSettingsOnPageload();
       });
     });
+    // *******************************************************************
+
+
+    // *******************************************************************
+    // *                  Global JavaScript Functions                    *
+    // *******************************************************************
 
     // Toggle the loading overlay (with !important)
     function showLoading(show) {
@@ -781,14 +792,15 @@
     function closeModal(modalId) {
       document.getElementById(modalId).classList.add('hidden');
     }
-
     // Open modal
     function openModal(modalId) {
       document.getElementById(modalId).classList.remove('hidden');
     }
+    // *******************************************************************
+
 
     //*******************************************************************
-    //*               Fetch data and render dashboard :                 *
+    //*            Fetch data and render dashboard functions            *
     //*******************************************************************
 
     // Fetch summary (jails, stats, last bans)
