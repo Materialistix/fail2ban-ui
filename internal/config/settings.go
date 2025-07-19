@@ -350,8 +350,8 @@ name = default
 logpath = /dev/null
 
 # Number of log lines to include in the email
-# grepmax = 1000
-# grepopts = -m <grepmax>`
+grepmax = 200
+grepopts = -m <grepmax>`
 
 	// Write the action file
 	err := os.WriteFile(actionFile, []byte(actionConfig), 0644)
