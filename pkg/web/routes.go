@@ -22,9 +22,6 @@ import (
 
 // RegisterRoutes sets up the routes for the Fail2ban UI.
 func RegisterRoutes(r *gin.Engine) {
-	// Serve static files for locales from the "internal/locales" directory.
-	// (This makes the translation files available under the /locales/ URL.)
-	r.Static("/locales", "./internal/locales")
 
 	// Render the dashboard
 	r.GET("/", IndexHandler)

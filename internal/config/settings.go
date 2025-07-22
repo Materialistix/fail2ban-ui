@@ -191,6 +191,8 @@ func initializeFromJailFile() error {
 
 // initializeFail2banAction writes a custom action configuration for Fail2ban to use AlertCountries.
 func initializeFail2banAction() error {
+	DebugLog("----------------------------")
+	DebugLog("Running initial initializeFail2banAction()") // entry point
 	// Ensure the jail.local is configured correctly
 	if err := setupGeoCustomAction(); err != nil {
 		fmt.Println("Error setup GeoCustomAction in jail.local:", err)
@@ -205,6 +207,7 @@ func initializeFail2banAction() error {
 
 // setupGeoCustomAction checks and replaces the default action in jail.local with our from fail2ban-UI
 func setupGeoCustomAction() error {
+	DebugLog("Running initial setupGeoCustomAction()") // entry point
 	file, err := os.Open(jailFile)
 	if err != nil {
 		// Fallback: Copy default file if jail.local is not found
@@ -284,6 +287,7 @@ func copyFile(src, dst string) error {
 
 // ensureJailDConfig checks if the jail.d file exists and creates it if necessary
 func ensureJailDConfig() error {
+	DebugLog("Running initial ensureJailDConfig()") // entry point
 	// Check if the file already exists
 	if _, err := os.Stat(jailDFile); err == nil {
 		// File already exists, do nothing
@@ -310,6 +314,8 @@ action_mwlg = %(action_)s
 
 // writeFail2banAction creates or updates the action file with the AlertCountries.
 func writeFail2banAction() error {
+	DebugLog("Running initial writeFail2banAction()") // entry point
+	DebugLog("----------------------------")
 	// Define the Fail2Ban action file content
 	actionConfig := `[INCLUDES]
 
@@ -344,8 +350,8 @@ name = default
 logpath = /dev/null
 
 # Number of log lines to include in the email
-# grepmax = 1000
-# grepopts = -m <grepmax>`
+grepmax = 200
+grepopts = -m <grepmax>`
 
 	// Write the action file
 	err := os.WriteFile(actionFile, []byte(actionConfig), 0644)
@@ -395,7 +401,7 @@ func saveSettings() error {
 	if err != nil {
 		DebugLog("Error writing to file: %v", err) // Debug
 	}
-	// Update the Fail2ban action file
+	// Write again the Fail2ban-UI action file (in the future not used anymore)
 	return writeFail2banAction()
 }
 
@@ -439,18 +445,11 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 		old.Bantime != new.Bantime ||
 		old.Findtime != new.Findtime ||
 		//old.Maxretry != new.Maxretry ||
-		old.Destemail != new.Destemail ||
-		//old.Sender != new.Sender {
 		old.Maxretry != new.Maxretry {
 		new.RestartNeeded = true
 	} else {
 		// preserve previous RestartNeeded if it was already true
 		new.RestartNeeded = new.RestartNeeded || old.RestartNeeded
-	}
-
-	// Countries change? Currently also requires a reload
-	if !equalStringSlices(old.AlertCountries, new.AlertCountries) {
-		new.RestartNeeded = true
 	}
 
 	currentSettings = new
@@ -463,20 +462,4 @@ func UpdateSettings(new AppSettings) (AppSettings, error) {
 	}
 	fmt.Println("Settings saved to file successfully") // Log save success
 	return currentSettings, nil
-}
-
-func equalStringSlices(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	m := make(map[string]bool)
-	for _, x := range a {
-		m[x] = false
-	}
-	for _, x := range b {
-		if _, ok := m[x]; !ok {
-			return false
-		}
-	}
-	return true
 }

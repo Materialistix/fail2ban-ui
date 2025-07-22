@@ -3,7 +3,7 @@
   "nav.dashboard": "Cruscotto",
   "nav.filter_debug": "Debug Filtro",
   "nav.settings": "Impostazioni",
-  "restart_banner.message": "Configurazione di Fail2ban modificata! Per applicare le modifiche, per favore: ",
+  "restart_banner.message": "Configurazione di Fail2ban modificata. Per applicare le modifiche, per favore ",
   "restart_banner.button": "Riavvia il servizio",
   "dashboard.title": "Cruscotto",
   "dashboard.overview": "Panoramica dei jail e dei blocchi attivi",

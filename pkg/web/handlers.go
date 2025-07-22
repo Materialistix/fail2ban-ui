@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/oschwald/maxminddb-golang"
 	"github.com/swissmakers/fail2ban-ui/internal/config"
 	"github.com/swissmakers/fail2ban-ui/internal/fail2ban"
@@ -112,14 +113,33 @@ func BanNotificationHandler(c *gin.Context) {
 
 	// **DEBUGGING: Log Raw JSON Body**
 	body, _ := io.ReadAll(c.Request.Body)
+	log.Printf("----------------------------------------------------")
+	log.Printf("Request Content-Length: %d", c.Request.ContentLength)
+	log.Printf("Request Headers: %v", c.Request.Header)
+	log.Printf("Request Headers: %v", c.Request.Body)
+
+	log.Printf("----------------------------------------------------")
+
 	config.DebugLog("📩 Incoming Ban Notification: %s\n", string(body))
 
 	// Rebind body so Gin can parse it again (important!)
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 
+	log.Printf("Request Content-Length: %d", c.Request.ContentLength)
+	log.Printf("Request Headers: %v", c.Request.Header)
+	log.Printf("Request Headers: %v", c.Request.Body)
+
 	// Parse JSON request body
 	if err := c.ShouldBindJSON(&request); err != nil {
-		log.Printf("❌ Invalid request: %v\n", err)
+		var verr validator.ValidationErrors
+		if errors.As(err, &verr) {
+			for _, fe := range verr {
+				log.Printf("❌ Validierungsfehler: Feld '%s' verletzt Regel '%s'", fe.Field(), fe.ActualTag())
+			}
+		} else {
+			log.Printf("❌ JSON-Parsing Fehler: %v", err)
+		}
+		log.Printf("Raw JSON: %s", string(body))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
 		return
 	}
@@ -439,13 +459,22 @@ func RestartFail2banHandler(c *gin.Context) {
 	//		return
 	//	}
 
-	// Then restart
-	if err := fail2ban.RestartFail2ban(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	// Attempt to restart the fail2ban service.
+	restartErr := fail2ban.RestartFail2ban()
+	if restartErr != nil {
+		// Check if running inside a container.
+		if _, container := os.LookupEnv("CONTAINER"); container {
+			// In a container, the restart command may fail (since fail2ban runs on the host).
+			// Log the error and continue, so we can mark the restart as done.
+			log.Printf("Warning: restart failed inside container (expected behavior): %v", restartErr)
+		} else {
+			// On the host, a restart error is not acceptable.
+			c.JSON(http.StatusInternalServerError, gin.H{"error": restartErr.Error()})
+			return
+		}
 	}
 
-	// We set restart done in config
+	// Only call MarkRestartDone if we either successfully restarted the service or we are in a container.
 	if err := config.MarkRestartDone(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -475,7 +504,8 @@ func sendEmail(to, subject, body string, settings config.AppSettings) error {
 	smtpAddr := net.JoinHostPort(smtpHost, fmt.Sprintf("%d", smtpPort))
 
 	// **Choose Connection Type**
-	if smtpPort == 465 {
+	switch smtpPort {
+	case 465:
 		// SMTPS (Implicit TLS) - Not supported at the moment.
 		tlsConfig := &tls.Config{ServerName: smtpHost}
 		conn, err := tls.Dial("tcp", smtpAddr, tlsConfig)
@@ -496,7 +526,7 @@ func sendEmail(to, subject, body string, settings config.AppSettings) error {
 
 		return sendSMTPMessage(client, settings.SMTP.From, to, msg)
 
-	} else if smtpPort == 587 {
+	case 587:
 		// STARTTLS (Explicit TLS)
 		conn, err := net.Dial("tcp", smtpAddr)
 		if err != nil {
