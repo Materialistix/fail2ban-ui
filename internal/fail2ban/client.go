@@ -19,6 +19,7 @@ package fail2ban
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
