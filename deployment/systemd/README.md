@@ -26,7 +26,7 @@ Clone the repository to `/opt/fail2ban-ui`:
   ```bash
   sudo git clone https://github.com/swissmakers/fail2ban-ui.git /opt/fail2ban-ui
   cd /opt/fail2ban-ui
-  sudo go build -o fail2ban-ui ./cmd/main.go
+  sudo go build -o fail2ban-ui ./cmd/server/main.go
   ```
 
 ### Create the fail2ban-ui.service
@@ -39,6 +39,7 @@ After=network.target fail2ban.service
 Requires=fail2ban.service
 
 [Service]
+Type=simple
 WorkingDirectory=/opt/fail2ban-ui
 ExecStart=/opt/fail2ban-ui/fail2ban-ui
 Restart=always
